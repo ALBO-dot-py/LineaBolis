@@ -1,0 +1,80 @@
+<div id="message" class="notification" hidden></div>
+
+<div class="level mb-4">
+  <div class="level-left">
+    <div>
+      <h2 class="title is-4 mb-1">Pagamenti</h2>
+    </div>
+  </div>
+</div>
+
+<div id="payments-kpis" class="columns is-multiline mb-2"></div>
+
+<div class="columns is-variable is-5 mb-5">
+  <div class="column is-two-thirds">
+    <section class="box home-chart-box">
+      <h3 class="title is-5">Andamento degli incassi</h3>
+      <div class="home-chart-wrap"><canvas id="payments-revenue-chart"></canvas></div>
+    </section>
+  </div>
+  <div class="column">
+    <section class="box home-chart-box">
+      <h3 class="title is-5">Prestazioni pagate ed in sospeso</h3>
+      <div class="home-chart-wrap"><canvas id="payments-status-chart"></canvas></div>
+    </section>
+  </div>
+</div>
+
+<div id="pagamenti-root"></div>
+
+<script>
+  (function () {
+    function renderStats(stats) {
+      const incassatoMese = stats.incassi_ultimi_6_mesi.at(-1)?.totale_cent ?? 0;
+      $("payments-kpis").innerHTML = [
+        homeKpiHtml("Da incassare oggi", euro(stats.da_incassare_oggi.totale_cent), `${stats.da_incassare_oggi.count} pagamenti previsti`, "fa-wallet"),
+        homeKpiHtml("Incassato questo mese", euro(incassatoMese), "Pagamenti registrati nel mese corrente", "fa-arrow-trend-up"),
+        homeKpiHtml("Importi in sospeso", euro(stats.in_sospeso.totale_cent), `${stats.in_sospeso.count} pagamenti scaduti`, "fa-triangle-exclamation", "has-text-danger"),
+      ].join("");
+
+      (window.NutrPaymentCharts || []).forEach((chart) => chart.destroy());
+      window.NutrPaymentCharts = [
+        new Chart($("payments-revenue-chart"), {
+          type: "bar",
+          data: {
+            labels: stats.incassi_ultimi_6_mesi.map((item) => monthLabel(item.mese)),
+            datasets: [{ label: "Incassato", data: stats.incassi_ultimi_6_mesi.map((item) => item.totale_cent / 100) }],
+          },
+          options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { callback: (value) => `${value} €` } } },
+          },
+        }),
+        new Chart($("payments-status-chart"), {
+          type: "doughnut",
+          data: {
+            labels: ["Pagati", "In sospeso"],
+            datasets: [{ data: [stats.pagati_ultimi_6_mesi, stats.in_sospeso_ultimi_6_mesi] }],
+          },
+          options: { maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } },
+        }),
+      ];
+    }
+
+    async function loadPage() {
+      try {
+        const panel = await montaPagamenti({
+          viewer: "nutrizionista",
+          panelUrl: "/pagamenti",
+          onChanged: loadPage,
+        });
+        renderStats(panel.statistiche);
+      } catch (err) {
+        message(err.message || "Impossibile caricare i pagamenti");
+      }
+    }
+
+    loadPage();
+  })();
+</script>

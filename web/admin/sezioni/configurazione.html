@@ -1,0 +1,61 @@
+<div id="message" class="notification" hidden></div>
+<div class="box">
+  <h2 class="title is-5">Configurazione</h2>
+  <form id="ac-form">
+    <div class="columns is-multiline">
+      <div class="column is-6">
+        <label class="label">Ore massime risposta appuntamento</label>
+        <input id="ac-response-hours" class="input" type="number" min="1" required>
+      </div>
+      <div class="column is-6">
+        <label class="label">Ore minime annullamento appuntamento</label>
+        <input id="ac-cancel-hours" class="input" type="number" min="0" required>
+      </div>
+      <div class="column is-6">
+        <label class="label">Timeout inattività sessione (ore)</label>
+        <input id="ac-idle-hours" class="input" type="number" min="1" required>
+      </div>
+      <div class="column is-6">
+        <label class="label">Durata assoluta sessione (ore)</label>
+        <input id="ac-absolute-hours" class="input" type="number" min="1" required>
+      </div>
+      <div class="column is-6">
+        <label class="label">Validità link impostazione password (ore)</label>
+        <input id="ac-password-token-hours" class="input" type="number" min="1" required>
+      </div>
+      <div class="column is-12">
+        <label class="label">Avviso disdetta tardiva</label>
+        <textarea id="ac-late-text" class="textarea" maxlength="2000" required></textarea>
+      </div>
+    </div>
+    <button class="button is-primary" type="submit">Salva configurazione</button>
+  </form>
+</div>
+
+<script>
+(function () {
+  async function load() {
+    const data = await request("/configurazione");
+    $("ac-response-hours").value = data.ore_massime_risposta_appuntamento;
+    $("ac-cancel-hours").value = data.ore_minime_annullamento_appuntamento;
+    $("ac-idle-hours").value = data.sessione_timeout_inattivita_ore;
+    $("ac-absolute-hours").value = data.sessione_durata_assoluta_ore;
+    $("ac-password-token-hours").value = data.token_password_validita_ore;
+    $("ac-late-text").value = data.testo_avviso_disdetta_tardiva;
+  }
+  $("ac-form").onsubmit = async (event) => {
+    event.preventDefault();
+    const payload = {
+      ore_massime_risposta_appuntamento: Number($("ac-response-hours").value),
+      ore_minime_annullamento_appuntamento: Number($("ac-cancel-hours").value),
+      testo_avviso_disdetta_tardiva: $("ac-late-text").value.trim(),
+      sessione_timeout_inattivita_ore: Number($("ac-idle-hours").value),
+      sessione_durata_assoluta_ore: Number($("ac-absolute-hours").value),
+      token_password_validita_ore: Number($("ac-password-token-hours").value),
+    };
+    try { await request("/configurazione", { method: "PUT", body: JSON.stringify(payload) }); message("Configurazione salvata", "is-success"); }
+    catch (err) { message(err.message); }
+  };
+  load().catch((err) => message(err.message));
+})();
+</script>

@@ -1,0 +1,22 @@
+<!-- Sezione condivisa da tutti i ruoli -->
+<div id="message" class="notification" hidden></div>
+<div class="columns is-variable is-5">
+  <div class="column is-two-thirds">
+    <div class="box">
+      <h2 class="title is-5">Cambia password</h2>
+      <form id="settings-password-form">
+        <div class="field"><label class="label">Password attuale</label><input id="settings-current-password" class="input" type="password" required></div>
+        <div class="field"><label class="label">Nuova password</label><input id="settings-new-password" class="input" type="password" minlength="10" required><p class="help">Sono richiesti almeno 10 caratteri, una maiuscola, una minuscola, un numero e un carattere speciale</p></div>
+        <div class="field"><label class="label">Conferma nuova password</label><input id="settings-confirm-password" class="input" type="password" minlength="10" required></div>
+        <button class="button is-primary">Salva</button>
+      </form>
+    </div>
+  </div>
+  <div class="column">
+    <div class="box">
+      <h2 class="title is-5">Sicurezza</h2>
+      <button class="button is-danger is-light" type="button" onclick="logoutAll()">Disconnetti tutti i dispositivi</button>
+    </div>
+  </div>
+</div>
+<script>initSettingsSection();</script>

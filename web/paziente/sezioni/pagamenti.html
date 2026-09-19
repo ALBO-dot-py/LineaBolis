@@ -1,0 +1,21 @@
+<div id="message" class="notification" hidden></div>
+
+<div class="level mb-4">
+  <div class="level-left">
+    <div>
+      <h2 class="title is-4 mb-1">Pagamenti</h2>
+    </div>
+  </div>
+</div>
+
+<div id="pagamenti-root"></div>
+
+<script>
+  (async function () {
+    try {
+      await montaPagamenti({ viewer: "paziente", panelUrl: "/me/pagamenti" });
+    } catch (err) {
+      message(err.message || "Impossibile caricare i pagamenti");
+    }
+  })();
+</script>

@@ -1,0 +1,147 @@
+<div id="message" class="notification" hidden></div>
+
+<div class="box">
+  <div class="level">
+    <div class="level-left"><h2 class="title is-5">Gestione nutrizionisti</h2></div>
+    <div class="level-right">
+      <button class="button is-primary" onclick="anOpenForm()">
+        <span class="icon"><i class="fa-solid fa-user-plus"></i></span><span>Crea nutrizionista</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="columns">
+    <div class="column is-8">
+      <input id="an-search" class="input" type="search" placeholder="Cerca per nome o email" oninput="anLoad()">
+    </div>
+    <div class="column is-4">
+      <div class="select is-fullwidth">
+        <select id="an-state" onchange="anLoad()">
+          <option value="">Tutti gli stati</option>
+          <option value="A">Attivi</option>
+          <option value="D">Sospesi</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table class="table is-fullwidth is-striped is-hoverable">
+      <thead><tr><th>Nutrizionista</th><th>Email</th><th>Ultimo accesso</th><th>Stato</th><th>Pazienti attivi</th><th>Azioni</th></tr></thead>
+      <tbody id="an-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal" id="an-form-modal">
+  <div class="modal-background" onclick="anCloseForm()"></div>
+  <div class="modal-card">
+    <header class="modal-card-head"><p id="an-form-title" class="modal-card-title">Crea nutrizionista</p><button class="delete" onclick="anCloseForm()"></button></header>
+    <section class="modal-card-body">
+      <input id="an-id" type="hidden">
+      <div class="columns is-multiline">
+        <div class="column is-6"><label class="label">Nome *</label><input id="an-name" class="input" maxlength="20" required></div>
+        <div class="column is-6"><label class="label">Cognome *</label><input id="an-surname" class="input" maxlength="20" required></div>
+        <div class="column is-6"><label class="label">Email *</label><input id="an-email" class="input" type="email" maxlength="100" required></div>
+        <div class="column is-6"><label class="label">Telefono</label><input id="an-phone" class="input" maxlength="15"></div>
+      </div>
+    </section>
+    <footer class="modal-card-foot"><button class="button is-primary" onclick="anSave()">Salva</button><button class="button" onclick="anCloseForm()">Annulla</button></footer>
+  </div>
+</div>
+
+<script>
+(function () {
+  let rows = [];
+  const fmtAccess = (value) => value ? fmtDate(value) : "-";
+  const statusTag = (state) => state === "A" ? '<span class="tag is-success">Attivo</span>' : '<span class="tag is-warning">Sospeso</span>';
+
+  window.anLoad = async function anLoad() {
+    const params = new URLSearchParams({ limit: "200" });
+    const q = $("an-search").value.trim();
+    const state = $("an-state").value;
+    if (q) params.set("q", q);
+    if (state) params.set("stato", state);
+    try {
+      rows = await request(`/admin/nutrizionisti?${params}`);
+      $("an-body").innerHTML = rows.length ? rows.map(renderRow).join("") : '<tr><td colspan="6" class="has-text-grey">Nessun nutrizionista trovato.</td></tr>';
+    } catch (err) { message(err.message); }
+  };
+
+  function renderRow(item) {
+    const u = item.utente;
+    const toggle = u.stato === "A"
+      ? `<button class="button is-small is-warning" onclick="anSuspend(${u.id})">Sospendi</button>`
+      : `<button class="button is-small is-success" onclick="anActivate(${u.id})">Attiva</button>`;
+    return `<tr>
+      <td><strong>${esc(u.nome)} ${esc(u.cognome)}</strong><br><span class="is-size-7">${esc(u.telefono || "-")}</span></td>
+      <td>${esc(u.email)}</td><td>${fmtAccess(u.last_login_at)}</td><td>${statusTag(u.stato)}</td>
+      <td>${item.numero_pazienti_attivi}</td>
+      <td><div class="buttons are-small">
+        <button class="button is-info is-light" onclick="anOpenForm(${u.id})">Modifica</button>${toggle}
+        <button class="button is-link is-light" onclick="anSetupPassword(${u.id})">Imposta password</button>
+        <button class="button is-danger is-light" onclick="anLogout(${u.id})">Logout dispositivi</button>
+      </div></td></tr>`;
+  }
+
+  window.anOpenForm = function anOpenForm(id = null) {
+    const item = rows.find((row) => row.utente.id === id);
+    const u = item?.utente;
+    $("an-id").value = id || "";
+    $("an-name").value = u?.nome || "";
+    $("an-surname").value = u?.cognome || "";
+    $("an-email").value = u?.email || "";
+    $("an-phone").value = u?.telefono || "";
+    $("an-form-title").textContent = id ? "Modifica nutrizionista" : "Crea nutrizionista";
+    openModal("an-form-modal");
+  };
+  window.anCloseForm = () => closeModal("an-form-modal");
+
+  window.anSave = async function anSave() {
+    const id = $("an-id").value;
+    const payload = {
+      nome: $("an-name").value.trim(), cognome: $("an-surname").value.trim(),
+      email: $("an-email").value.trim(), telefono: $("an-phone").value.trim() || null,
+    };
+    if (!payload.nome || !payload.cognome || !payload.email) return message("Compila nome, cognome ed email.");
+    try {
+      const result = await request(id ? `/admin/nutrizionisti/${id}` : "/admin/nutrizionisti", {
+        method: id ? "PUT" : "POST", body: JSON.stringify(payload),
+      });
+      anCloseForm();
+      await anLoad();
+      if (!id) linkMessage(result.url_impostazione_password, "Nutrizionista creato: copia il link");
+      else message("Nutrizionista aggiornato.", "is-success");
+    } catch (err) { message(err.message); }
+  };
+
+  window.anActivate = async function anActivate(id) {
+    try { await request(`/admin/nutrizionisti/${id}/attiva`, { method: "PATCH" }); await anLoad(); }
+    catch (err) { message(err.message); }
+  };
+
+  window.anSuspend = async function anSuspend(id) {
+    if (!confirm("Sospendere il nutrizionista? Le sessioni verranno revocate.")) return;
+    try {
+      await request(`/admin/nutrizionisti/${id}/disattiva`, { method: "PATCH" });
+      await anLoad(); message("Nutrizionista sospeso.", "is-success");
+    } catch (err) { message(err.message); }
+  };
+
+  window.anSetupPassword = async function anSetupPassword(id) {
+    if (!confirm("Generare un nuovo link? L’account verrà disattivato e le sessioni revocate.")) return;
+    try {
+      const result = await request(`/admin/nutrizionisti/${id}/imposta-password`, { method: "POST" });
+      await anLoad();
+      linkMessage(result.url_impostazione_password, "Nuovo link per impostare la password");
+    } catch (err) { message(err.message); }
+  };
+  window.anLogout = async function anLogout(id) {
+    if (!confirm("Disconnettere il nutrizionista da tutti i dispositivi?")) return;
+    try { await request(`/admin/nutrizionisti/${id}/logout-all`, { method: "POST" }); message("Sessioni revocate.", "is-success"); }
+    catch (err) { message(err.message); }
+  };
+
+  anLoad();
+})();
+</script>

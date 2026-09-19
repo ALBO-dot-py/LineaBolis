@@ -1,0 +1,114 @@
+<div id="message" class="notification" hidden></div>
+<div class="columns is-variable is-5 mb-5">
+  <div class="column is-two-thirds">
+    <section class="box home-chart-box">
+      <h3 class="title is-5">Andamento degli appuntamenti</h3>
+      <div class="home-chart-wrap"><canvas id="home-nutr-appointments-chart"></canvas></div>
+    </section>
+  </div>
+  <div class="column">
+    <section class="box home-chart-box">
+      <h3 class="title is-5">Esiti degli appuntamenti</h3>
+      <div class="home-chart-wrap"><canvas id="home-nutr-outcomes-chart"></canvas></div>
+    </section>
+  </div>
+</div>
+
+<div id="home-nutr-operations"></div>
+
+<script>
+  (function () {
+    function todayBounds() {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      return [start.toISOString(), end.toISOString()];
+    }
+
+    function renderCharts(appointmentStats) {
+      (window.NutrHomeCharts || []).forEach((chart) => chart.destroy());
+      const completedTotal = appointmentStats.reduce((sum, item) => sum + item.effettuati, 0);
+      const missedOrLateTotal = appointmentStats.reduce((sum, item) => sum + item.assenze_disdette, 0);
+      const yellow = "#facc15";
+      const orange = "#f97316";
+
+      window.NutrHomeCharts = [
+        new Chart($("home-nutr-appointments-chart"), {
+          type: "bar",
+          data: {
+            labels: appointmentStats.map((item) => monthLabel(item.mese)),
+            datasets: [{
+              label: "Effettuati",
+              data: appointmentStats.map((item) => item.effettuati),
+              backgroundColor: yellow,
+              borderColor: yellow,
+            }],
+          },
+          options: {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+          },
+        }),
+        new Chart($("home-nutr-outcomes-chart"), {
+          type: "doughnut",
+          data: {
+            labels: ["Effettuati", "Mancate presenze / disdette tardive"],
+            datasets: [{
+              data: [completedTotal, missedOrLateTotal],
+              backgroundColor: [yellow, orange],
+              borderColor: [yellow, orange],
+            }],
+          },
+          options: {
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "bottom" },
+              tooltip: {
+                callbacks: {
+                  label: (context) => `${context.label}: ${context.raw}`,
+                },
+              },
+            },
+          },
+        }),
+      ];
+    }
+
+    async function loadHome() {
+      try {
+        const [todayStart, tomorrowStart] = todayBounds();
+        const [pending, allTodayAppointments, appointmentStats] = await Promise.all([
+          request("/appuntamenti?stato=P&limit=100"),
+          request(`/appuntamenti?data_da=${encodeURIComponent(todayStart)}&data_a=${encodeURIComponent(tomorrowStart)}&limit=100`),
+          request("/appuntamenti/statistiche/esiti"),
+        ]);
+
+        pending.sort((a, b) => new Date(a.data_ora_inizio) - new Date(b.data_ora_inizio));
+        const todayAppointments = allTodayAppointments
+          .filter((item) => ["C", "E", "M"].includes(item.stato))
+          .sort((a, b) => new Date(a.data_ora_inizio) - new Date(b.data_ora_inizio));
+
+        $("home-nutr-operations").innerHTML = `
+          <div class="columns is-variable is-4 is-multiline">
+            <div class="column is-half-tablet">${appointmentSectionHtml("prossimi", { title: "Appuntamenti da fare oggi" })}</div>
+            <div class="column is-half-tablet">${appointmentSectionHtml("daConfermare", { title: "Appuntamenti da confermare" })}</div>
+          </div>`;
+
+        ApptState.cfg = { viewer: "nutrizionista", actionUrlBase: "/appuntamenti", onChanged: loadHome };
+        ApptState.page.prossimi = 0;
+        ApptState.page.daConfermare = 0;
+        apptRenderPanel({
+          prossimi_appuntamenti: todayAppointments,
+          richieste_da_confermare: pending,
+        });
+        renderCharts(appointmentStats);
+      } catch (err) {
+        message(err.message || "Impossibile caricare la home");
+      }
+    }
+
+    loadHome();
+  })();
+</script>

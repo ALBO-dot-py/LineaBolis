@@ -1,0 +1,487 @@
+<div id="message" class="notification" hidden></div>
+
+<div id="pt-list-view">
+  <div class="box">
+    <div class="level mb-4">
+      <div class="level-left">
+        <h2 class="title is-5 mb-0"><span class="icon has-text-primary"><i class="fa-solid fa-users"></i></span> I tuoi pazienti</h2>
+      </div>
+      <div class="level-right">
+        <button class="button is-primary" onclick="ptOpenNewPatient()"><span class="icon"><i class="fa-solid fa-user-plus"></i></span><span>Crea Nuovo Cliente</span></button>
+      </div>
+    </div>
+    <div class="field">
+      <div class="control has-icons-left">
+        <input id="pt-search" class="input is-medium" type="search" placeholder="Cerca paziente per nome, obiettivo..." oninput="ptLoadPatients()">
+        <span class="icon is-left"><i class="fa-solid fa-magnifying-glass"></i></span>
+      </div>
+    </div>
+    <div id="pt-patient-list" class="mt-4"></div>
+  </div>
+</div>
+
+<div id="pt-detail-view" hidden>
+  <button class="button is-light is-small mb-3" onclick="ptBackToList()"><span class="icon"><i class="fa-solid fa-arrow-left"></i></span><span>Torna alla lista</span></button>
+
+  <div class="box has-background-primary has-text-white mb-0">
+    <div class="is-flex is-align-items-center is-gap-3">
+      <div id="pt-avatar" class="has-background-primary-light has-text-primary has-text-weight-bold is-flex is-align-items-center is-justify-content-center" style="width:68px;height:68px;border-radius:50%"></div>
+      <div>
+        <h2 id="pt-title" class="title is-4 has-text-white mb-1">Paziente</h2>
+        <p id="pt-sub" class="has-text-white-bis mb-1"></p>
+        <p id="pt-goal" class="has-text-white-bis"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs is-boxed mb-4">
+    <ul id="pt-inner-tabs">
+      <li class="is-active" data-tab="anagrafica"><a>Anagrafica</a></li>
+      <li data-tab="misure"><a>Misurazioni</a></li>
+      <li data-tab="dieta"><a>Dieta</a></li>
+      <li data-tab="appuntamenti"><a>Appuntamenti</a></li>
+      <li data-tab="pagamenti"><a>Pagamenti</a></li>
+    </ul>
+  </div>
+
+  <div id="pt-tab-body"></div>
+</div>
+
+<!-- Creazione paziente -->
+<div class="modal" id="pt-new-modal">
+  <div class="modal-background" onclick="ptCloseNewPatient()"></div>
+  <div class="modal-card" style="width:min(920px,96vw)">
+    <header class="modal-card-head"><p class="modal-card-title">Nuovo paziente</p><button class="delete" onclick="ptCloseNewPatient()"></button></header>
+    <section class="modal-card-body">
+      <div id="pt-created-box" class="notification is-success" hidden></div>
+      <div class="columns is-multiline">
+        <div class="column is-3"><label class="label">Nome *</label><input id="pt-new-nome" class="input" maxlength="20" required></div>
+        <div class="column is-3"><label class="label">Cognome *</label><input id="pt-new-cognome" class="input" maxlength="20" required></div>
+        <div class="column is-3"><label class="label">Email/login *</label><input id="pt-new-email" class="input" type="email" required></div>
+        <div class="column is-3"><label class="label">Telefono</label><input id="pt-new-tel" class="input"></div>
+        <div class="column is-3"><label class="label">Data nascita *</label><input id="pt-new-nascita" class="input" type="date" required></div>
+        <div class="column is-3"><label class="label">Sesso *</label><div class="select is-fullwidth"><select id="pt-new-sesso"><option value="M">Maschio</option><option value="F">Femmina</option></select></div></div>
+        <div class="column is-3"><label class="label">Codice fiscale *</label><input id="pt-new-cf" class="input" maxlength="16" required></div>
+        <div class="column is-3"><label class="label">Peso obiettivo (kg)*</label><input id="pt-new-goal" class="input" type="number" min="1" step="0.1" required></div>
+        <div class="column is-12"><label class="label">Note interne</label><textarea id="pt-new-note" class="textarea" rows="2"></textarea><p class="help">Private: non vengono mostrate al paziente</p></div>
+      </div>
+
+    </section>
+    <footer class="modal-card-foot"><button class="button is-primary" onclick="ptSaveNewPatient()">Crea paziente</button><button class="button" onclick="ptCloseNewPatient()">Chiudi</button></footer>
+  </div>
+</div>
+
+<!-- Dati clinici -->
+<div class="modal" id="pt-medical-modal">
+  <div class="modal-background" onclick="ptCloseMedical()"></div>
+  <div class="modal-card">
+    <header class="modal-card-head"><p class="modal-card-title">Gestisci dati clinici</p><button class="delete" onclick="ptCloseMedical()"></button></header>
+    <section class="modal-card-body" id="pt-medical-list"></section>
+    <footer class="modal-card-foot">
+      <div class="field has-addons" style="width:100%">
+        <div class="control"><div class="select"><select id="pt-medical-type"><option value="P">Patologia</option><option value="A">Allergia</option><option value="F">Farmaco</option><option value="T">Terapia</option></select></div></div>
+        <div class="control is-expanded"><input id="pt-medical-description" class="input" placeholder="Descrizione"></div>
+        <div class="control"><button id="pt-medical-save" class="button is-primary" onclick="ptSaveMedical()">Aggiungi</button></div>
+        <div class="control"><button id="pt-medical-cancel" class="button" onclick="ptCancelMedicalEdit()" hidden>Annulla</button></div>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- Misurazione -->
+<div class="modal" id="pt-measure-modal">
+  <div class="modal-background" onclick="ptCloseMeasure()"></div>
+  <div class="modal-card" style="width:min(920px,96vw)">
+    <header class="modal-card-head"><p class="modal-card-title">Nuova misurazione</p><button class="delete" onclick="ptCloseMeasure()"></button></header>
+    <section class="modal-card-body">
+      <div class="columns is-multiline">
+        <div class="column is-4"><label class="label">Data *</label><input id="pm-data" class="input" type="date"></div>
+        <div class="column is-4"><label class="label">Peso (kg)*</label><input id="pm-peso" class="input" type="number" min="0" step="0.1" required></div>
+        <div class="column is-4"><label class="label">Altezza (cm)*</label><input id="pm-altezza" class="input" type="number" min="0" step="0.1" required></div>
+        <div class="column is-12"><p class="has-text-weight-semibold">Pliche obbligatorie *</p></div>
+        <div class="column is-3"><input id="pm-tri" class="input" type="number" min="0" step="0.1" placeholder="Tricipitale *" required></div>
+        <div class="column is-3"><input id="pm-bic" class="input" type="number" min="0" step="0.1" placeholder="Bicipitale *" required></div>
+        <div class="column is-3"><input id="pm-sot" class="input" type="number" min="0" step="0.1" placeholder="Sottoscapolare *" required></div>
+        <div class="column is-3"><input id="pm-sov" class="input" type="number" min="0" step="0.1" placeholder="Sovrailiaca *" required></div>
+        <div class="column is-12"><p class="has-text-weight-semibold">Pliche facoltative</p></div>
+        <div class="column is-3"><input id="pm-omb" class="input" type="number" min="0" step="0.1" placeholder="Ombelicale mm"></div>
+        <div class="column is-3"><input id="pm-pet" class="input" type="number" min="0" step="0.1" placeholder="Pettorale mm"></div>
+        <div class="column is-3"><input id="pm-cos" class="input" type="number" min="0" step="0.1" placeholder="Coscia mm"></div>
+        <div class="column is-12"><p class="has-text-weight-semibold">Circonferenze facoltative</p></div>
+        <div class="column is-3"><input id="pm-vita" class="input" type="number" min="0" step="0.1" placeholder="Vita cm"></div>
+        <div class="column is-3"><input id="pm-fianchi" class="input" type="number" min="0" step="0.1" placeholder="Fianchi cm"></div>
+        <div class="column is-3"><input id="pm-bicipite" class="input" type="number" min="0" step="0.1" placeholder="Bicipite cm"></div>
+        <div class="column is-3"><input id="pm-coscia-circ" class="input" type="number" min="0" step="0.1" placeholder="Coscia cm"></div>
+        <div class="column is-3"><input id="pm-torace" class="input" type="number" min="0" step="0.1" placeholder="Torace cm"></div>
+        <div class="column is-3"><input id="pm-addome" class="input" type="number" min="0" step="0.1" placeholder="Addome cm"></div>
+        <div class="column is-6"><label class="label">Note interne</label><textarea id="pm-note-int" class="textarea" rows="2"></textarea></div>
+        <div class="column is-6"><label class="label">Note visibili al paziente</label><textarea id="pm-note-paz" class="textarea" rows="2"></textarea></div>
+      </div>
+    </section>
+    <footer class="modal-card-foot"><button class="button is-primary" onclick="ptSaveMeasure()">Salva</button><button class="button" onclick="ptCloseMeasure()">Annulla</button></footer>
+  </div>
+</div>
+
+<!-- Dieta -->
+<div class="modal" id="pt-diet-modal">
+  <div class="modal-background" onclick="ptCloseDiet()"></div>
+  <div class="modal-card" style="width:min(980px,96vw)">
+    <header class="modal-card-head"><p id="pt-diet-title" class="modal-card-title">Nuova dieta</p><button class="delete" onclick="ptCloseDiet()"></button></header>
+    <section class="modal-card-body">
+      <div class="tabs is-toggle is-toggle-rounded is-small mb-4"><ul>
+        <li id="pd-step-1" class="is-active"><a>Dati dieta</a></li>
+        <li id="pd-step-2"><a>Pasti e opzioni</a></li>
+        <li id="pd-step-3"><a>Configurazioni finali</a></li>
+      </ul></div>
+      <div id="pd-body"></div>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <button class="button" onclick="ptDietBack()">Indietro</button>
+      <div class="buttons mb-0"><button class="button" onclick="ptCloseDiet()">Annulla</button><button class="button is-primary" onclick="ptDietNext()" id="pd-next">Avanti</button></div>
+    </footer>
+  </div>
+</div>
+
+<script>
+(function () {
+  // Stato unico
+  const S = { patients: [], patient: null, activeTab: "anagrafica", slots: [], measurePage: 0, weightChart: null, fatChart: null, plicheChart: null, diet: null, medical: [], medicalEdit: null };
+  const val = (id) => $(id)?.value?.trim() || "";
+  const num = (id) => val(id) ? Number(val(id)) : null;
+  const isoDate = (plusDays = 0) => { const d = new Date(); d.setDate(d.getDate() + plusDays); return d.toISOString().slice(0, 10); };
+  const fmt = (v) => v == null || v === "" ? "-" : esc(v);
+  const safe = (v) => escAttr(v == null ? "" : v);
+  const nameOf = (p) => `${p.utente.nome} ${p.utente.cognome}`;
+  const initials = (p) => `${p.utente.nome?.[0] || ""}${p.utente.cognome?.[0] || ""}`.toUpperCase();
+  const dietStatus = { A:"Attiva", R:"Archiviata" };
+  const medicalMeta = { P: "Patologie", A: "Allergie / Intolleranze", F: "Farmaci", T: "Terapie" };
+
+  window.ptLoadPatients = async function ptLoadPatients() {
+    const q = val("pt-search");
+    const path = q.length >= 2 ? `/pazienti?includi_eliminati=true&cerca=${encodeURIComponent(q)}&limit=50` : "/pazienti?includi_eliminati=true&limit=50";
+    try {
+      S.patients = await request(path);
+      $("pt-patient-list").innerHTML = S.patients.length ? S.patients.map(patientRow).join("") : '<p class="has-text-grey">Nessun paziente trovato</p>';
+    } catch (err) { message(err.message || "Impossibile caricare i pazienti"); }
+  };
+
+  function patientRow(p) {
+    const age = ageOf(p.profilo.data_nascita);
+    return `<div class="is-flex is-align-items-center py-3" style="border-bottom:1px solid #eee;cursor:pointer" onclick="ptSelectPatient(${p.utente.id})">
+      <div class="has-background-primary has-text-white has-text-weight-bold is-flex is-align-items-center is-justify-content-center mr-4" style="width:54px;height:54px;border-radius:50%">${initials(p)}</div>
+      <div><p class="has-text-weight-bold is-size-5 mb-0">${fmt(nameOf(p))} <span class="tag ${p.utente.stato === "A" ? "is-success" : "is-warning"}">${p.utente.stato === "A" ? "Attivo" : "Disattivato"}</span></p><p class="has-text-grey">${age ? age + " anni · " : ""}${fmt(p.utente.email)}${p.profilo.peso_obiettivo_kg ? " · Obiettivo " + p.profilo.peso_obiettivo_kg + " kg" : ""}</p></div>
+      <div class="ml-auto has-text-grey"><i class="fa-solid fa-chevron-right"></i></div>
+    </div>`;
+  }
+
+  function ageOf(d) {
+    if (!d) return null;
+    const b = new Date(d), n = new Date();
+    const before = n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate());
+    return n.getFullYear() - b.getFullYear() - (before ? 1 : 0);
+  }
+
+  window.ptSelectPatient = async function ptSelectPatient(id) {
+    S.patient = S.patients.find((p) => p.utente.id === id) || await request(`/pazienti/${id}`);
+    $("pt-list-view").hidden = true; $("pt-detail-view").hidden = false;
+    $("pt-avatar").textContent = initials(S.patient);
+    $("pt-title").textContent = nameOf(S.patient);
+    $("pt-sub").textContent = `${ageOf(S.patient.profilo.data_nascita) || "-"} anni  -  ${S.patient.utente.email || "-"}  -  ${S.patient.utente.telefono || "-"}`;
+    $("pt-goal").textContent = S.patient.profilo.peso_obiettivo_kg ? `Obiettivo ${S.patient.profilo.peso_obiettivo_kg} kg` : "Peso Obiettivo non impostato";
+    await ptShowTab(S.activeTab);
+  };
+
+  window.ptBackToList = () => { $("pt-detail-view").hidden = true; $("pt-list-view").hidden = false; };
+  $("pt-inner-tabs").addEventListener("click", (e) => { const li = e.target.closest("li[data-tab]"); if (li) ptShowTab(li.dataset.tab); });
+  async function ptShowTab(tab) { S.activeTab = tab; [...$("pt-inner-tabs").children].forEach((li) => li.classList.toggle("is-active", li.dataset.tab === tab)); await ({ anagrafica: loadAnagrafica, misure: loadMisure, dieta: loadDieta, appuntamenti: loadAppuntamenti, pagamenti: loadPagamenti })[tab](); }
+
+  window.ptOpenNewPatient = function ptOpenNewPatient() {
+    $("pt-created-box").hidden = true;
+    ["pt-new-nome","pt-new-cognome","pt-new-email","pt-new-tel","pt-new-cf","pt-new-goal","pt-new-note"].forEach((id) => $(id).value = "");
+    $("pt-new-nascita").value = "";
+    $("pt-new-sesso").value = "M";
+    openModal("pt-new-modal");
+  };
+  window.ptCloseNewPatient = () => closeModal("pt-new-modal");
+
+  window.ptSaveNewPatient = async function ptSaveNewPatient() {
+    try {
+      const payload = { nome: val("pt-new-nome"), cognome: val("pt-new-cognome"), email: val("pt-new-email"), telefono: val("pt-new-tel") || null, codice_fiscale: val("pt-new-cf") || null, data_nascita: val("pt-new-nascita"), sesso: val("pt-new-sesso"), peso_obiettivo_kg: num("pt-new-goal"), note_nutrizionista: val("pt-new-note") || null };
+      if (!payload.nome || !payload.cognome || !payload.email || !payload.data_nascita || !payload.sesso) throw new Error("Compila tutti i campi obbligatori prima di procedere");
+      const created = await request("/pazienti", { method: "POST", body: JSON.stringify(payload) });
+      renderCopyLink($("pt-created-box"), created.url_impostazione_password, `Paziente creato (${created.utente.email}): copia il link`);
+      await ptLoadPatients();
+    } catch (err) { message(err.message || "Creazione non riuscita"); }
+  };
+
+  async function loadAnagrafica() {
+    const data = await request(`/pazienti/${S.patient.utente.id}/anagrafica`);
+    S.patient = { utente: data.utente, profilo: data.profilo };
+    const u = data.utente, p = data.profilo;
+    S.medical = data.dati_medici || [];
+    const medical = groupMedical(S.medical);
+    const activeButton = u.stato === "A"
+      ? `<button class="button is-warning" onclick="ptTogglePatient('disattiva')">Disattiva</button>`
+      : `<button class="button is-success" onclick="ptTogglePatient('attiva')">Attiva</button>`;
+    $("pt-tab-body").innerHTML = `<div class="columns is-multiline">
+      <div class="column is-7"><div class="box">
+        <div class="level"><div class="level-left"><h3 class="title is-5">Dati medici / profilo</h3></div><div class="level-right"><span class="tag ${u.stato === "A" ? "is-success" : "is-warning"}">${u.stato === "A" ? "Attivo" : "Disattivato"}</span></div></div>
+        <div class="columns is-multiline">
+          <div class="column is-6"><label class="label">Nome *</label><input id="pt-edit-name" class="input" maxlength="20" value="${safe(u.nome)}"></div>
+          <div class="column is-6"><label class="label">Cognome *</label><input id="pt-edit-surname" class="input" maxlength="20" value="${safe(u.cognome)}"></div>
+          <div class="column is-6"><label class="label">Email *</label><input id="pt-edit-email" class="input" type="email" maxlength="100" value="${safe(u.email)}"></div>
+          <div class="column is-6"><label class="label">Telefono</label><input id="pt-edit-phone" class="input" maxlength="15" value="${safe(u.telefono)}"></div>
+          <div class="column is-6"><label class="label">Data di nascita *</label><input id="pt-edit-birth" class="input" type="date" value="${safe(p.data_nascita)}"></div>
+          <div class="column is-6"><label class="label">Sesso *</label><div class="select is-fullwidth"><select id="pt-edit-sex"><option value="M" ${p.sesso === "M" ? "selected" : ""}>Maschio</option><option value="F" ${p.sesso === "F" ? "selected" : ""}>Femmina</option></select></div></div>
+          <div class="column is-6"><label class="label">Codice fiscale</label><input id="pt-edit-cf" class="input" maxlength="16" value="${safe(p.codice_fiscale)}"></div>
+          <div class="column is-6"><label class="label">Peso obiettivo (kg)</label><input id="pt-edit-goal" class="input" type="number" min="1" step="0.1" value="${p.peso_obiettivo_kg ?? ""}"></div>
+          <div class="column is-12"><label class="label">Nota privata nutrizionista</label><textarea id="pt-edit-note" class="textarea" rows="3">${safe(p.note_nutrizionista)}</textarea></div>
+        </div>
+        <div class="buttons"><button class="button is-primary" onclick="ptSaveProfile()">Salva profilo</button>${activeButton}<button class="button is-link is-light" onclick="ptSetupPassword()">Imposta password</button><button class="button is-danger is-light" onclick="ptLogoutPatient()">Logout dispositivi</button></div>
+        <p class="is-size-7 has-text-grey">Ultimo accesso: ${u.last_login_at ? fmtDate(u.last_login_at) : "-"}</p>
+      </div></div>
+      <div class="column is-5"><div class="box"><div class="level mb-3"><div class="level-left"><h3 class="title is-5 mb-0">Dati clinici</h3></div><div class="level-right"><button class="button is-small" onclick="ptOpenMedical()"><span class="icon"><i class="fa-solid fa-notes-medical"></i></span><span>Gestisci</span></button></div></div>${Object.entries(medicalMeta).map(([tipo, titolo]) => medicalBlock(titolo, medical[tipo])).join("")}</div></div>
+    </div>`;
+  }
+  window.ptSaveProfile = async function ptSaveProfile() {
+    const payload = { nome: val("pt-edit-name"), cognome: val("pt-edit-surname"), email: val("pt-edit-email"), telefono: val("pt-edit-phone") || null, codice_fiscale: val("pt-edit-cf") || null, data_nascita: val("pt-edit-birth"), sesso: val("pt-edit-sex"), peso_obiettivo_kg: num("pt-edit-goal"), note_nutrizionista: val("pt-edit-note") || null };
+    if (!payload.nome || !payload.cognome || !payload.email || !payload.data_nascita || !payload.sesso) return message("Compila tutti i campi obbligatori.");
+    try {
+      S.patient = await request(`/pazienti/${S.patient.utente.id}`, { method: "PUT", body: JSON.stringify(payload) });
+      await ptLoadPatients();
+      $("pt-title").textContent = nameOf(S.patient);
+      message("Profilo aggiornato.", "is-success");
+      await loadAnagrafica();
+    } catch (err) { message(err.message || "Salvataggio non riuscito"); }
+  };
+  window.ptTogglePatient = async function ptTogglePatient(action) {
+    try { await request(`/pazienti/${S.patient.utente.id}/${action}`, { method: "PATCH" }); await ptLoadPatients(); await loadAnagrafica(); }
+    catch (err) { message(err.message); }
+  };
+  window.ptSetupPassword = async function ptSetupPassword() {
+    if (!confirm("Generare un nuovo link? L’account verrà disattivato e le sessioni revocate")) return;
+    try {
+      const result = await request(`/pazienti/${S.patient.utente.id}/imposta-password`, { method: "POST" });
+      await ptLoadPatients();
+      await loadAnagrafica();
+      linkMessage(result.url_impostazione_password, "Nuovo link per impostare la password");
+    } catch (err) { message(err.message); }
+  };
+  window.ptLogoutPatient = async function ptLogoutPatient() {
+    if (!confirm("Disconnettere il paziente da tutti i dispositivi?")) return;
+    try { await request(`/pazienti/${S.patient.utente.id}/logout-all`, { method: "POST" }); message("Tutte le sessioni sono state revocate", "is-success"); }
+    catch (err) { message(err.message); }
+  };
+  function groupMedical(rows) { const out = { P: [], A: [], F: [], T: [] }; rows.forEach((r) => (out[r.tipo] ||= []).push(r)); return out; }
+  function medicalBlock(title, rows) { return `<div class="mb-3"><p class="has-text-weight-semibold is-size-7 has-text-grey mb-1">${fmt(title)}</p><div class="tags">${rows.length ? rows.map((r) => `<span class="tag is-light">${fmt(r.descrizione)}</span>`).join("") : '<span class="tag is-light">Nessun dato</span>'}</div></div>`; }
+  function renderMedicalEditor() { const rows = groupMedical(S.medical); $("pt-medical-list").innerHTML = Object.entries(medicalMeta).map(([tipo, titolo]) => `<p class="label">${fmt(titolo)}</p><div class="tags">${rows[tipo].length ? rows[tipo].map((r) => `<span class="tags has-addons mr-2 mb-2"><span class="tag">${fmt(r.descrizione)}</span><a class="tag" onclick="ptEditMedical(${r.id})"><i class="fa-solid fa-pen"></i></a><a class="tag is-delete" onclick="ptDeleteMedical(${r.id})"></a></span>`).join("") : '<span class="tag is-light">Nessun dato</span>'}</div>`).join(""); }
+  window.ptCancelMedicalEdit = function ptCancelMedicalEdit() { S.medicalEdit = null; $("pt-medical-type").value = "P"; $("pt-medical-description").value = ""; $("pt-medical-save").textContent = "Aggiungi"; $("pt-medical-cancel").hidden = true; };
+  window.ptOpenMedical = function ptOpenMedical() { renderMedicalEditor(); ptCancelMedicalEdit(); openModal("pt-medical-modal"); };
+  window.ptCloseMedical = () => closeModal("pt-medical-modal");
+  window.ptEditMedical = function ptEditMedical(id) { const row = S.medical.find((r) => r.id === id); if (!row) return; S.medicalEdit = id; $("pt-medical-type").value = row.tipo; $("pt-medical-description").value = row.descrizione; $("pt-medical-save").textContent = "Salva"; $("pt-medical-cancel").hidden = false; };
+  window.ptSaveMedical = async function ptSaveMedical() { const descrizione = val("pt-medical-description"); if (!descrizione) return; const id = S.medicalEdit, base = `/pazienti/${S.patient.utente.id}/dati-medici`; try { await request(id ? `${base}/${id}` : base, { method: id ? "PUT" : "POST", body: JSON.stringify({ tipo: val("pt-medical-type"), descrizione }) }); await loadAnagrafica(); ptOpenMedical(); } catch (err) { message(err.message || "Salvataggio del dato clinico non riuscito"); } };
+  window.ptDeleteMedical = async function ptDeleteMedical(id) { if (!confirm("Eliminare questo dato?")) return; try { await request(`/pazienti/${S.patient.utente.id}/dati-medici/${id}`, { method: "DELETE" }); await loadAnagrafica(); ptOpenMedical(); } catch (err) { message(err.message || "Eliminazione del dato clinico non riuscita"); } };
+
+  async function loadMisure() {
+    $("pt-tab-body").innerHTML = `<div class="level"><div class="level-left"><h3 class="title is-5">Misurazioni</h3></div><div class="level-right"><button class="button is-primary" onclick="ptOpenMeasure()">Nuova misurazione</button></div></div>
+      ${misurazioniCorporeeHtml(true)}`;
+    await caricaMisurazioniCorporee({
+      progressiUrl: `/pazienti/${S.patient.utente.id}/misurazioni/progressi`,
+      storicoUrlBase: `/pazienti/${S.patient.utente.id}/misurazioni`,
+      mostraStorico: true,
+    });
+  }
+
+  window.ptMeasurePage = async (d) => { McState.storicoPage = Math.max(0, McState.storicoPage + d); await mcCaricaStorico(); };
+  window.ptOpenMeasure = () => { ["pm-peso","pm-altezza","pm-tri","pm-bic","pm-sot","pm-sov","pm-omb","pm-pet","pm-cos","pm-vita","pm-fianchi","pm-bicipite","pm-coscia-circ","pm-torace","pm-addome","pm-note-int","pm-note-paz"].forEach((id) => $(id).value = ""); $("pm-data").value = isoDate(); openModal("pt-measure-modal"); };
+  window.ptCloseMeasure = () => closeModal("pt-measure-modal");
+  window.ptSaveMeasure = async function ptSaveMeasure() {
+    try {
+      const required = ["pm-data","pm-peso","pm-altezza","pm-tri","pm-bic","pm-sot","pm-sov"];
+      if (required.some((id) => !val(id))) throw new Error("Compila data, peso, altezza e le quattro pliche obbligatorie.");
+      await request(`/pazienti/${S.patient.utente.id}/misurazioni`, { method: "POST", body: JSON.stringify({ data: val("pm-data"), peso_kg: num("pm-peso"), altezza_cm: num("pm-altezza"), plica_tricipitale_mm: num("pm-tri"), plica_bicipitale_mm: num("pm-bic"), plica_sottoscapolare_mm: num("pm-sot"), plica_sovrailiaca_mm: num("pm-sov"), plica_ombelicale_mm: num("pm-omb"), plica_pettorale_mm: num("pm-pet"), plica_coscia_mm: num("pm-cos"), circ_vita_cm: num("pm-vita"), circ_fianchi_cm: num("pm-fianchi"), circ_bicipite_cm: num("pm-bicipite"), circ_coscia_cm: num("pm-coscia-circ"), circ_torace_cm: num("pm-torace"), circ_addome_cm: num("pm-addome"), note_nutrizionista: val("pm-note-int") || null, note_paziente: val("pm-note-paz") || null }) });
+      ptCloseMeasure(); await loadMisure(); message("Misurazione salvata.", "is-success");
+    } catch (err) { message(err.message || "Salvataggio non riuscito"); }
+  };
+
+  async function loadDieta() {
+    const panel = await request(`/diete/pazienti/${S.patient.utente.id}`);
+    S.dietPanel = panel;
+    const active = panel.attiva;
+    const history = panel.archiviate || [];
+    $("pt-tab-body").innerHTML = `<div class="level"><div class="level-left"><h3 class="title is-5">Diete</h3></div><div class="level-right"><button class="button is-primary" onclick="ptOpenDiet()">Nuova dieta</button></div></div><div class="box"><h4 class="title is-6">Dieta attiva</h4>${active ? activeDietCard(active) : '<p class="has-text-grey">Nessuna dieta attiva</p>'}</div><div class="box"><h4 class="title is-6">Storico diete</h4>${history.length ? history.map(historyDietCard).join("") : '<p class="has-text-grey">Nessuna dieta archiviata</p>'}</div>`;
+  }
+
+  function activeDietCard(dieta) {
+    return `<article class="notification is-primary is-light"><div class="level mb-2"><div class="level-left"><strong>${fmt(dieta.nome)}</strong></div><div class="level-right"><span class="tag">${dietStatus[dieta.stato]}</span></div></div><p class="is-size-7 mb-2">Professionista: ${fmt(dieta.nutrizionista_nome)} · Attiva dal ${fmt(dieta.data_inizio_validita)}</p>${dieta.note ? `<p><strong>Note dieta per paziente:</strong> ${fmt(dieta.note)}</p>` : ""}${dieta.note_nutrizionista ? `<p><strong>Note private:</strong> ${fmt(dieta.note_nutrizionista)}</p>` : ""}${progressDiet(dieta.progressi)}<div class="buttons mt-3"><button class="button is-small is-primary is-light" onclick="ptOpenDiet(${dieta.id})">Modifica dieta</button><button class="button is-small is-warning is-light" onclick="ptArchiveDiet(${dieta.id})">Archivia</button></div></article>`;
+  }
+
+  function historyDietCard(dieta) {
+    return `<article class="notification is-light"><div class="level mb-2"><div class="level-left"><strong>${fmt(dieta.nome)}</strong></div><div class="level-right"><span class="tag">${dietStatus[dieta.stato]}</span></div></div><p class="is-size-7 mb-2">Professionista: ${fmt(dieta.nutrizionista_nome)} · Dieta attiva dal ${fmt(dieta.data_inizio_validita)} al ${fmt(dieta.data_fine_validita)}</p>${dieta.note ? `<p><strong>Note paziente:</strong> ${fmt(dieta.note)}</p>` : ""}${dieta.note_nutrizionista ? `<p><strong>Note private:</strong> ${fmt(dieta.note_nutrizionista)}</p>` : ""}${progressDiet(dieta.progressi)}${dieta.considerazioni_finali ? `<p class="mt-2"><strong>Considerazioni finali:</strong> ${fmt(dieta.considerazioni_finali)}</p>` : ""}<div class="buttons mt-3"><button class="button is-small is-primary is-light" onclick="ptViewDiet(${dieta.id})">Visualizza dieta</button><button class="button is-small is-light" onclick="ptEditFinalNotes(${dieta.id})">Modifica considerazioni finali</button></div></article>`;
+  }
+
+  function progressDiet(progress) {
+    if (!progress || !progress.dati_sufficienti) return '<p class="has-text-grey is-size-7">Dati insufficienti per calcolare le variazioni</p>';
+    const goalTone = Number(progress.obiettivo_delta_kg) > 0 ? "is-success" : Number(progress.obiettivo_delta_kg) < 0 ? "is-danger" : "";
+    const pliche = Object.entries(progress.pliche_delta || {}).map(([key, value]) => `<span class="tag is-light">${fmt(key)} ${signed(value)} mm</span>`).join("");
+    const goal = progress.obiettivo_delta_kg == null ? "" : `<span class="tag ${goalTone} is-light">Obiettivo ${signed(progress.obiettivo_delta_kg)} kg</span>`;
+    return `<div class="tags mt-2"><span class="tag is-light">Peso ${signed(progress.kg_delta)} kg</span>${goal}<span class="tag is-light">Massa grassa ${signed(progress.massa_grassa_delta)}%</span>${pliche}</div>`;
+  }
+
+  const signed = (value) => value == null ? "-" : `${Number(value) > 0 ? "+" : ""}${Number(value).toFixed(2)}`;
+
+  window.ptArchiveDiet = async function ptArchiveDiet(id) {
+    const value = prompt("Considerazioni finali private facoltative:", "");
+    if (value == null) return;
+    try {
+      await request(`/diete/${id}/archivia`, {
+        method: "PATCH",
+        body: JSON.stringify({ considerazioni_finali: window.DietEditor.textValue(value, { emptyToNull: true }) }),
+      });
+      await loadDieta();
+      message("Dieta archiviata.", "is-success");
+    } catch (err) {
+      message(err.message || "Archiviazione non riuscita");
+    }
+  };
+
+  window.ptEditFinalNotes = async function ptEditFinalNotes(id) {
+    const dieta = (S.dietPanel?.archiviate || []).find((item) => Number(item.id) === Number(id));
+    const value = prompt("Considerazioni finali private:", dieta?.considerazioni_finali || "");
+    if (value == null) return;
+    try {
+      await request(`/diete/${id}/considerazioni-finali`, {
+        method: "PATCH",
+        body: JSON.stringify({ considerazioni_finali: window.DietEditor.textValue(value, { emptyToNull: true }) }),
+      });
+      await loadDieta();
+      message("Considerazioni finali aggiornate.", "is-success");
+    } catch (err) {
+      message(err.message || "Aggiornamento non riuscito");
+    }
+  };
+
+  window.ptViewDiet = async function ptViewDiet(id) {
+    try {
+      const dieta = await request(`/diete/${id}`);
+      S.diet = {
+        step: 1,
+        editor: new window.DietEditor({
+          containerId: "pd-body",
+          kind: "assigned",
+          mode: "read",
+          data: dieta,
+          templates: [],
+        }),
+      };
+      $("pt-diet-title").textContent = "Visualizza dieta archiviata";
+      renderDietWizard();
+      openModal("pt-diet-modal");
+    } catch (err) {
+      message(err.message || "Impossibile aprire la dieta");
+    }
+  };
+
+  window.ptOpenDiet = async function ptOpenDiet(id = null) {
+    try {
+      const [dieta, templates] = await Promise.all([
+        id ? request(`/diete/${id}`) : Promise.resolve(null),
+        id ? Promise.resolve([]) : request("/diete/templates?limit=100"),
+      ]);
+      S.diet = {
+        step: 1,
+        editor: new window.DietEditor({
+          containerId: "pd-body",
+          kind: "assigned",
+          mode: id ? "edit" : "create",
+          data: dieta,
+          templates,
+        }),
+      };
+      $("pt-diet-title").textContent = id ? "Modifica dieta" : "Nuova dieta";
+      renderDietWizard();
+      openModal("pt-diet-modal");
+    } catch (err) {
+      message(err.message || "Impossibile aprire la dieta");
+    }
+  };
+
+  window.ptCloseDiet = () => { closeModal("pt-diet-modal"); S.diet = null; };
+  window.ptDietBack = () => {
+    if (!S.diet || S.diet.step === 1) return;
+    S.diet.step -= 1;
+    renderDietWizard();
+  };
+  window.ptDietNext = async () => {
+    if (!S.diet) return;
+    const readOnly = S.diet.editor.readOnly;
+    if (!readOnly) {
+      const validation = S.diet.editor.validateStep(S.diet.step);
+      if (validation) return message(validation);
+    }
+    if (S.diet.step < 3) {
+      S.diet.step += 1;
+      renderDietWizard();
+      return;
+    }
+    if (readOnly) return ptCloseDiet();
+    await saveDietWizard();
+  };
+
+  function renderDietWizard() {
+    [1, 2, 3].forEach((step) => $(`pd-step-${step}`).classList.toggle("is-active", S.diet.step === step));
+    const readOnly = S.diet.editor.readOnly;
+    $("pd-next").textContent = S.diet.step === 3 ? (readOnly ? "Chiudi" : "Salva dieta") : "Avanti";
+    S.diet.editor.render(S.diet.step);
+  }
+
+  async function saveDietWizard() {
+    const editor = S.diet.editor;
+    const edit = editor.mode === "edit";
+    const payload = editor.payload(edit ? {} : { paziente_id: S.patient.utente.id });
+    try {
+      await request(edit ? `/diete/attiva/${editor.state.id}` : "/diete/attiva", {
+        method: edit ? "PUT" : "POST",
+        body: JSON.stringify(payload),
+      });
+      ptCloseDiet();
+      await loadDieta();
+      message(edit ? "Dieta aggiornata." : "Dieta salvata.", "is-success");
+    } catch (err) {
+      message(err.message || "Salvataggio dieta non riuscito");
+    }
+  }
+
+  // Appuntamenti
+  async function loadAppuntamenti() {
+    $("pt-tab-body").innerHTML = `<div class="level mb-4"><div class="level-left"><h3 class="title is-5 mb-0">Appuntamenti di ${fmt(nameOf(S.patient))}</h3></div></div>
+      <div id="appt-container">${appuntamentiHtml({ mostraWizard: true, mostraSezioniNutrizionista: true })}</div>`;
+    try {
+      await caricaAppuntamenti({
+        viewer: "nutrizionista",
+        panelUrl: `/appuntamenti/pazienti/${S.patient.utente.id}/pannello`,
+        actionUrlBase: "/appuntamenti",
+        tipiUrl: "/appuntamenti/tipi",
+        slotUrl: "/appuntamenti/slot",
+        createUrl: "/appuntamenti",
+        extraCreatePayload: () => ({ paziente_id: S.patient.utente.id }),
+        onSubmitted: () => message("Richiesta inviata.", "is-success"),
+      });
+    } catch (err) {
+      message(err.message || "Impossibile caricare gli appuntamenti del paziente");
+    }
+  }
+
+  // Pagamenti 
+  async function loadPagamenti() {
+    $("pt-tab-body").innerHTML = '<div id="pt-pagamenti-root"></div>';
+    await montaPagamenti({
+      rootId: "pt-pagamenti-root",
+      viewer: "nutrizionista",
+      panelUrl: `/pagamenti?paziente_id=${S.patient.utente.id}`,
+    });
+  }
+
+  ptLoadPatients();
+})();
+</script>

@@ -1,0 +1,206 @@
+<div id="message" class="notification" hidden></div>
+<div id="toast-area" class="app-toast" aria-live="assertive"></div>
+
+<div class="box">
+  <div class="level is-align-items-flex-start">
+    <div class="level-left">
+      <div>
+        <h2 class="title is-4 mb-2">
+          <span class="icon has-text-primary"><i class="fa-solid fa-clipboard-list"></i></span>
+          <span>Configura template diete</span>
+        </h2>
+      </div>
+    </div>
+    <div class="level-right">
+      <button class="button is-primary" onclick="openTemplateWizard()">
+        <span class="icon"><i class="fa-solid fa-plus"></i></span>
+        <span>Nuovo template</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="field mt-5">
+    <label class="label">Cerca per nome</label>
+    <div class="control has-icons-left">
+      <input id="template-search" class="input" placeholder="Es. mediterranea, sportiva, vegetariana..." oninput="filterTemplateList()">
+      <span class="icon is-left"><i class="fa-solid fa-magnifying-glass"></i></span>
+    </div>
+  </div>
+</div>
+
+<div id="template-list"></div>
+
+<div id="template-wizard-modal" class="modal">
+  <div class="modal-background" onclick="closeTemplateWizard()"></div>
+  <div class="modal-card" style="width:min(960px, 96vw);">
+    <header class="modal-card-head">
+      <div>
+        <p id="template-wizard-title" class="modal-card-title">Nuovo template</p>
+        <p id="template-wizard-subtitle" class="is-size-7 has-text-grey mt-1"></p>
+      </div>
+      <button class="delete" aria-label="close" onclick="closeTemplateWizard()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="steps-wrapper mb-5">
+        <div class="tabs is-toggle is-toggle-rounded is-small">
+          <ul>
+            <li id="template-step-tab-1" class="is-active"><a><span>Dati template</span></a></li>
+            <li id="template-step-tab-2"><a><span>Pasti e opzioni</span></a></li>
+          </ul>
+        </div>
+      </div>
+      <div id="template-wizard-body"></div>
+    </section>
+    <footer class="modal-card-foot is-justify-content-space-between">
+      <button id="template-back-btn" class="button" onclick="templateWizardBack()">Indietro</button>
+      <div class="buttons mb-0">
+        <button class="button" onclick="closeTemplateWizard()">Annulla</button>
+        <button id="template-next-btn" class="button is-primary" onclick="templateWizardNext()">Avanti</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script>
+(function () {
+  const state = { templates: [], details: new Map(), editor: null, step: 1 };
+  let toastTimer = null;
+
+  function success(text) {
+    const box = $("message");
+    box.className = "notification is-success";
+    box.textContent = text;
+    box.hidden = false;
+  }
+
+  function error(text) {
+    const area = $("toast-area");
+    area.innerHTML = `<div class="notification is-danger"><button class="delete" onclick="this.parentElement.remove()"></button>${esc(text)}</div>`;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { area.innerHTML = ""; }, 8000);
+  }
+
+  function card(template) {
+    return `<div class="card mb-4"><div class="card-content"><div class="level is-align-items-flex-start mb-3"><div class="level-left"><div><p class="title is-5 mb-2">${esc(template.nome)}</p>${template.note ? `<p class="has-text-grey">${esc(template.note)}</p>` : ""}<p class="is-size-7 has-text-grey mt-2">Tipologia: ${tipoDietaLabel(template.tipo)}</p></div></div><div class="level-right"><div class="buttons are-small"><button class="button is-primary is-light" onclick="openTemplateWizard(${template.id})"><span class="icon"><i class="fa-solid fa-pen"></i></span><span>Modifica</span></button><button class="button is-info is-light" onclick="duplicateTemplate(${template.id})"><span class="icon"><i class="fa-solid fa-copy"></i></span><span>Duplica</span></button><button class="button is-danger is-light" onclick="deleteTemplate(${template.id})"><span class="icon"><i class="fa-solid fa-trash"></i></span><span>Elimina</span></button></div></div></div></div></div>`;
+  }
+
+  async function detail(id) {
+    const key = Number(id);
+    if (state.details.has(key)) return state.details.get(key);
+    const value = await request(`/diete/templates/${key}`);
+    state.details.set(key, value);
+    return value;
+  }
+
+  async function loadTemplates() {
+    try {
+      state.templates = await request("/diete/templates?limit=100");
+      renderList();
+    } catch (err) {
+      error(err.message || "Impossibile caricare i template dieta");
+    }
+  }
+
+  function renderList() {
+    const query = ($("template-search")?.value || "").trim().toLowerCase();
+    const filtered = state.templates.filter((template) => !query || String(template.nome || "").toLowerCase().includes(query));
+    if (!state.templates.length) {
+      $("template-list").innerHTML = '<div class="notification is-light">Nessun template configurato</div>';
+      return;
+    }
+    $("template-list").innerHTML = filtered.length ? filtered.map(card).join("") : '<div class="notification is-warning is-light">Nessun template trovato con questo nome</div>';
+  }
+
+  window.filterTemplateList = renderList;
+
+  function renderWizard() {
+    $("template-step-tab-1").classList.toggle("is-active", state.step === 1);
+    $("template-step-tab-2").classList.toggle("is-active", state.step === 2);
+    $("template-back-btn").style.visibility = state.step === 1 ? "hidden" : "visible";
+    $("template-next-btn").textContent = state.step === 1 ? "Avanti" : "Salva template";
+    state.editor.render(state.step);
+  }
+
+  window.openTemplateWizard = async function openTemplateWizard(id = null) {
+    try {
+      const template = id ? await detail(id) : null;
+      state.step = 1;
+      state.editor = new window.DietEditor({
+        containerId: "template-wizard-body",
+        kind: "template",
+        mode: id ? "edit" : "create",
+        data: template,
+      });
+      $("template-wizard-title").textContent = id ? "Modifica template dieta" : "Nuovo template dieta";
+      renderWizard();
+      openModal("template-wizard-modal");
+    } catch (err) {
+      error(err.message || "Impossibile aprire il template");
+    }
+  };
+
+  window.closeTemplateWizard = function closeTemplateWizard() {
+    closeModal("template-wizard-modal");
+    state.editor = null;
+  };
+
+  window.templateWizardBack = function templateWizardBack() {
+    if (!state.editor || state.step === 1) return;
+    state.step = 1;
+    renderWizard();
+  };
+
+  window.templateWizardNext = async function templateWizardNext() {
+    if (!state.editor) return;
+    const validation = state.editor.validateStep(state.step);
+    if (validation) return error(validation);
+    if (state.step === 1) {
+      state.step = 2;
+      renderWizard();
+      return;
+    }
+    try {
+      const id = state.editor.state.id;
+      await request(id ? `/diete/templates/${id}` : "/diete/templates", {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(state.editor.payload()),
+      });
+      closeTemplateWizard();
+      state.details.clear();
+      await loadTemplates();
+      success("Template salvato correttamente");
+    } catch (err) {
+      error(err.message || "Impossibile salvare il template");
+    }
+  };
+
+  window.duplicateTemplate = async function duplicateTemplate(id) {
+    try {
+      const template = await detail(id);
+      const payload = window.DietEditor.buildPayload(template, "template");
+      payload.nome = `Copia di ${template.nome}`;
+      await request("/diete/templates", { method: "POST", body: JSON.stringify(payload) });
+      state.details.clear();
+      await loadTemplates();
+      success("Template dieta duplicato con successo");
+    } catch (err) {
+      error(err.message || "Impossibile duplicare il template");
+    }
+  };
+
+  window.deleteTemplate = async function deleteTemplate(id) {
+    const template = state.templates.find((item) => Number(item.id) === Number(id));
+    if (!confirm(`Eliminare definitivamente "${template?.nome || "questo template"}"? Le diete già create non saranno modificate`)) return;
+    try {
+      await request(`/diete/templates/${id}`, { method: "DELETE" });
+      state.details.delete(Number(id));
+      await loadTemplates();
+      success("Template eliminato");
+    } catch (err) {
+      error(err.message || "Impossibile eliminare il template");
+    }
+  };
+
+  loadTemplates();
+})();
+</script>

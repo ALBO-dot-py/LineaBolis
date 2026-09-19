@@ -1,0 +1,16 @@
+<div id="message" class="notification is-danger" hidden></div>
+<div id="progressi-content"></div>
+
+<script>
+  (async function () {
+    try {
+      $("progressi-content").innerHTML = misurazioniCorporeeHtml(false);
+      await caricaMisurazioniCorporee({
+        progressiUrl: "/me/misurazioni/progressi",
+        mostraStorico: false,
+      });
+    } catch (err) {
+      message(err.message || "Impossibile caricare i progressi");
+    }
+  })();
+</script>

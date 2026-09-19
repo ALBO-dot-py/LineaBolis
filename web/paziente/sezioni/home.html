@@ -1,0 +1,94 @@
+<div id="message" class="notification" hidden></div>
+
+<div class="level mb-5">
+  <div class="level-left">
+    <div>
+      <h2 class="title is-3 mb-1">La tua home</h2>
+    </div>
+  </div>
+</div>
+
+<div id="home-patient-kpis" class="columns is-multiline mb-2"></div>
+
+<div id="home-patient-progress-component"></div>
+
+<div class="columns is-variable is-5 mb-5">
+  <div class="column is-half">
+    <section class="box home-chart-box">
+      <h3 class="title is-5">Andamento del peso</h3>
+      <div class="home-chart-wrap"><canvas id="home-patient-weight-chart"></canvas></div>
+    </section>
+  </div>
+  <div class="column is-half">
+    <section class="box home-chart-box">
+      <h3 class="title is-5">Andamento della massa grassa</h3>
+      <div class="home-chart-wrap"><canvas id="home-patient-fat-chart"></canvas></div>
+    </section>
+  </div>
+</div>
+
+<!-- vengono riutilizzate le sezioni complete delle pagine Prenotazioni e Pagamenti -->
+<div id="home-patient-operations"></div>
+
+<script>
+  (function () {
+    const paymentSection = pagamentoSections("paziente")[0];
+
+    $("home-patient-progress-component").innerHTML = misurazioniProgressHtml("home-patient", "mb-5");
+
+    function renderProgress(data) {
+      const progress = data.avanzamento;
+      const current = data.attuale;
+      const goal = data.peso_obiettivo_kg;
+
+      const pesoDeltaValue = progress ? `${progress.peso_perso_kg > 0 ? "-" : "+"}${Math.abs(progress.peso_perso_kg)} kg` : "-";
+
+      $("home-patient-kpis").innerHTML = [
+        homeKpiHtml("Peso attuale", current ? `${current.peso_kg} kg` : "-", "", "fa-weight-scale"),
+        homeKpiHtml("Peso obiettivo", goal ? `${goal} kg` : "-", "", "fa-bullseye"),
+        homeKpiHtml("Differenza di peso", pesoDeltaValue, "", "fa-arrow-down"),
+        homeKpiHtml("Massa grassa attuale", current ? `${current.massa_grassa_perc}%` : "-", "", "fa-chart-line"),
+      ].join("");
+
+      renderMisurazioniProgress("home-patient", data);
+      window.PatientHomeWeightChart = mcChart("home-patient-weight-chart", window.PatientHomeWeightChart, mcSerie(data, "peso"), "Peso kg", { maintainAspectRatio: false });
+      window.PatientHomeFatChart = mcChart("home-patient-fat-chart", window.PatientHomeFatChart, mcSerie(data, "massa_grassa"), "Massa grassa %", { maintainAspectRatio: false });
+    }
+
+    async function loadHome() {
+      try {
+        const [appointments, payments, progress] = await Promise.all([
+          request("/me/appuntamenti/pannello"),
+          request("/me/pagamenti"),
+          request("/me/misurazioni/progressi"),
+        ]);
+
+        $("home-patient-operations").innerHTML = `
+          <div class="columns is-variable is-4 is-multiline">
+            <div class="column is-one-third-tablet">${appointmentSectionHtml("prossimi")}</div>
+            <div class="column is-one-third-tablet">${appointmentSectionHtml("daConfermare")}</div>
+            <div class="column is-one-third-tablet"><div id="home-patient-payments"></div></div>
+          </div>`;
+
+        ApptState.cfg = { viewer: "paziente", actionUrlBase: "/me/appuntamenti", onChanged: loadHome };
+        ApptState.page.prossimi = 0;
+        ApptState.page.daConfermare = 0;
+        apptRenderPanel(appointments);
+
+        await montaPagamenti({
+          rootId: "home-patient-payments",
+          viewer: "paziente",
+          panel: payments,
+          sections: [paymentSection],
+          compact: true,
+        });
+
+        renderProgress(progress);
+      } catch (err) {
+        message(err.message || "Impossibile caricare la home");
+      }
+    }
+
+    loadHome();
+  })();
+</script>

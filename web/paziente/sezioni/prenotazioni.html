@@ -1,0 +1,23 @@
+<div id="message" class="notification" hidden></div>
+<div id="appt-container"></div>
+
+<script>
+  (function () {
+    $("appt-container").innerHTML = appuntamentiHtml({ mostraWizard: true });
+
+    (async function init() {
+      try {
+        await caricaAppuntamenti({
+          viewer: "paziente",
+          panelUrl: "/me/appuntamenti/pannello",
+          actionUrlBase: "/me/appuntamenti",
+          tipiUrl: "/me/appuntamenti/tipi",
+          slotUrl: "/me/appuntamenti/slot",
+          createUrl: "/me/appuntamenti",
+        });
+      } catch (err) {
+        message(err.message || "Impossibile caricare le prenotazioni");
+      }
+    })();
+  })();
+</script>

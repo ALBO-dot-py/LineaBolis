@@ -1,0 +1,243 @@
+<!--
+Sezione 'Disponibilità' del nutrizionista: gestione delle fasce orarie ricorrenti e delle indisponibilità puntuali.
+-->
+<div id="message" class="notification" hidden></div>
+
+<div class="columns is-variable is-5">
+  <div class="column">
+    <div class="box">
+      <h2 class="title is-5">
+        <span class="icon has-text-primary"><i class="fa-solid fa-clock"></i></span>
+        Slot Ricorrenti
+      </h2>
+
+      <div id="disp-list"></div>
+
+      <hr>
+
+      <h3 class="title is-6">
+        <span class="icon has-text-primary"><i class="fa-solid fa-circle-plus"></i></span>
+        Aggiungi Slot
+      </h3>
+
+      <div class="columns is-variable is-3">
+        <div class="column">
+          <label class="label">Giorno</label>
+          <div class="select is-fullwidth">
+            <select id="disp-day">
+              <option value="0">Lunedì</option>
+              <option value="1">Martedì</option>
+              <option value="2">Mercoledì</option>
+              <option value="3">Giovedì</option>
+              <option value="4">Venerdì</option>
+              <option value="5">Sabato</option>
+              <option value="6">Domenica</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="column">
+          <label class="label">Inizio</label>
+          <input id="disp-start" class="input" type="time" value="09:00">
+        </div>
+
+        <div class="column">
+          <label class="label">Fine</label>
+          <input id="disp-end" class="input" type="time" value="13:00">
+        </div>
+      </div>
+
+      <button class="button is-primary is-small" onclick="addDisponibilita()">
+        <span class="icon"><i class="fa-solid fa-plus"></i></span>
+        <span>Aggiungi</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="column">
+    <div class="box">
+      <h2 class="title is-5">
+        <span class="icon has-text-primary"><i class="fa-solid fa-ban"></i></span>
+        Periodi di Indisponibilità
+      </h2>
+
+      <div class="notification is-warning is-light py-3">
+        <span class="icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+        Prima di bloccare un periodo è necessario gestire, dalla sezione Appuntamenti, gli eventuali appuntamenti sovrapposti
+      </div>
+
+      <div id="indisp-list"></div>
+
+      <hr>
+
+      <h3 class="title is-6">
+        <span class="icon has-text-primary"><i class="fa-solid fa-circle-plus"></i></span>
+        Blocca Periodo
+      </h3>
+
+      <div class="columns is-variable is-3">
+        <div class="column">
+          <label class="label">Dal</label>
+          <input id="indisp-start" class="input" type="datetime-local">
+        </div>
+
+        <div class="column">
+          <label class="label">Al</label>
+          <input id="indisp-end" class="input" type="datetime-local">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Motivo</label>
+        <input id="indisp-reason" class="input" placeholder="es. Ferie, Congresso..." required>
+      </div>
+
+      <button class="button is-danger is-light is-small" onclick="addIndisponibilita()">
+        <span class="icon"><i class="fa-solid fa-ban"></i></span>
+        <span>Blocca Periodo</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
+    function time(value) {
+      return String(value || "").slice(0, 5);
+    }
+
+    function toIsoFromLocalInput(value) {
+      return new Date(value).toISOString();
+    }
+
+    function fmtDt(value) {
+      return fmtDate(value, { timeZone: "Europe/Rome", dateStyle: "short", timeStyle: "short" });
+    }
+
+    function dispRow(item) {
+      return `<div class="is-flex is-align-items-center is-justify-content-space-between has-background-light p-3 mb-2" style="border-radius:8px;">
+        <div>
+          <strong>${giorni[item.giorno_settimana]}</strong>
+          <span class="ml-5">${time(item.ora_inizio)} – ${time(item.ora_fine)}</span>
+        </div>
+        <button class="button is-danger is-light is-small" onclick="deleteDisponibilita(${item.id})">
+          <span class="icon"><i class="fa-solid fa-trash"></i></span>
+        </button>
+      </div>`;
+    }
+
+    function indispRow(item) {
+      return `<div class="notification is-danger is-light py-3 px-4 mb-2">
+        <div class="is-flex is-align-items-center is-justify-content-space-between">
+          <div>
+            <strong>${fmtDt(item.data_ora_inizio)} → ${fmtDt(item.data_ora_fine)}</strong><br>
+            <small>${esc(item.motivo || "-")}</small>
+          </div>
+          <button class="button is-danger is-light is-small" onclick="deleteIndisponibilita(${item.id})">
+            <span class="icon"><i class="fa-solid fa-trash"></i></span>
+          </button>
+        </div>
+      </div>`;
+    }
+
+    window.loadDisponibilita = async function loadDisponibilita() {
+      try {
+        const items = await request("/disponibilita");
+        $("disp-list").innerHTML = items.length ? items.map(dispRow).join("") : '<p class="has-text-grey">Nessuno slot configurato</p>';
+      } catch (err) {
+        message(err.message || "Impossibile caricare le disponibilità");
+      }
+    };
+
+    window.addDisponibilita = async function addDisponibilita() {
+      const body = {
+        giorno_settimana: Number($("disp-day").value),
+        ora_inizio: $("disp-start").value,
+        ora_fine: $("disp-end").value,
+      };
+      if (!body.ora_inizio || !body.ora_fine) return message("Inizio e fine sono obbligatori");
+      try {
+        await request("/disponibilita", { method: "POST", body: JSON.stringify(body) });
+        await loadDisponibilita();
+        message("Disponibilità salvata.", "is-success");
+      } catch (err) {
+        message(err.message || "Impossibile aggiungere lo slot");
+      }
+    };
+
+    window.deleteDisponibilita = async function deleteDisponibilita(id) {
+      if (!confirm("Eliminare questo slot di disponibilità?")) return;
+      try {
+        await request(`/disponibilita/${id}`, { method: "DELETE" });
+        await loadDisponibilita();
+        message("Slot eliminato.", "is-success");
+      } catch (err) {
+        message(err.message || "Impossibile eliminare lo slot");
+      }
+    };
+
+    window.loadIndisponibilita = async function loadIndisponibilita() {
+      try {
+        const items = await request("/indisponibilita");
+        $("indisp-list").innerHTML = items.length ? items.map(indispRow).join("") : '<p class="has-text-grey">Nessun periodo bloccato</p>';
+      } catch (err) {
+        message(err.message || "Impossibile caricare le indisponibilità");
+      }
+    };
+
+    async function createIndisponibilita(body) {
+      try {
+        await request("/indisponibilita", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        $("indisp-start").value = "";
+        $("indisp-end").value = "";
+        $("indisp-reason").value = "";
+        await loadIndisponibilita();
+        message("Periodo bloccato.", "is-success");
+      } catch (err) {
+        const conflitti = err.data?.conflitti || [];
+        if (err.status === 409 && conflitti.length) {
+          const elenco = conflitti.map((a) => {
+            const tipo = a.tipo || "appuntamento";
+            const paziente = a.paziente_nome || `paziente ${a.paziente_id}`;
+            const azione = a.stato === "P" ? "da rifiutare" : "da annullare";
+            return `#${a.id} · ${paziente} · ${tipo} · ${fmtDt(a.data_ora_inizio)} · ${azione}`;
+          }).join("\n");
+          alert(`Gestisci prima questi appuntamenti dalla sezione Appuntamenti:\n\n${elenco}`);
+        }
+        message(err.message || "Impossibile bloccare il periodo");
+      }
+    }
+
+
+    window.addIndisponibilita = async function addIndisponibilita() {
+      const start = $("indisp-start").value;
+      const end = $("indisp-end").value;
+      const motivo = $("indisp-reason").value.trim();
+      if (!start || !end || !motivo) return message("Dal, Al e Motivo sono obbligatori");
+      if (new Date(end) <= new Date(start)) return message("La data finale deve essere successiva a quella iniziale");
+      if (new Date(end) <= new Date()) return message("Non è possibile bloccare un periodo già terminato");
+      await createIndisponibilita({
+        data_ora_inizio: toIsoFromLocalInput(start),
+        data_ora_fine: toIsoFromLocalInput(end),
+        motivo,
+      });
+    };
+
+    window.deleteIndisponibilita = async function deleteIndisponibilita(id) {
+      if (!confirm("Eliminare questo periodo di indisponibilità?")) return;
+      try {
+        await request(`/indisponibilita/${id}`, { method: "DELETE" });
+        await loadIndisponibilita();
+        message("Periodo eliminato.", "is-success");
+      } catch (err) {
+        message(err.message || "Impossibile eliminare il periodo");
+      }
+    };
+
+    Promise.all([loadDisponibilita(), loadIndisponibilita()]);
+  })();
+</script>

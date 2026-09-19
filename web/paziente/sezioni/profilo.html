@@ -1,0 +1,190 @@
+
+<div id="message" class="notification is-danger" hidden></div>
+
+<div class="columns">
+  <div class="column is-6">
+    <div class="box">
+      <div class="level mb-4">
+        <div class="level-left"><h2 class="title is-5 mb-0">Dati Anagrafici</h2></div>
+      </div>
+      <table class="table is-fullwidth">
+        <tbody id="profile"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="column is-6">
+    <div class="box">
+      <div class="level mb-4">
+        <div class="level-left"><h2 class="title is-5 mb-0">Dati Medici</h2></div>
+        <div class="level-right">
+          <button class="button is-small" onclick="apriModaleMedici()">
+            <span class="icon"><i class="fa-solid fa-notes-medical"></i></span><span>Gestisci</span>
+          </button>
+        </div>
+      </div>
+      <div id="dati-medici"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modale-medici">
+  <div class="modal-background" onclick="chiudiModale('modale-medici')"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">Gestisci Dati Medici</p>
+      <button class="delete" onclick="chiudiModale('modale-medici')"></button>
+    </header>
+    <section class="modal-card-body" id="medici-lista"></section>
+    <footer class="modal-card-foot">
+      <div class="field has-addons" style="width:100%">
+        <div class="control">
+          <div class="select">
+            <select id="nuovo-tipo">
+              <option value="P">Patologia</option>
+              <option value="A">Allergia</option>
+              <option value="F">Farmaco</option>
+              <option value="T">Terapia</option>
+            </select>
+          </div>
+        </div>
+        <div class="control is-expanded"><input class="input" id="nuovo-descrizione" placeholder="Descrizione"></div>
+        <div class="control"><button class="button is-primary" id="salva-dato-medico" onclick="salvaDatoMedico()">Aggiungi</button></div>
+        <div class="control"><button class="button" id="annulla-modifica-medico" onclick="annullaModificaDatoMedico()" hidden>Annulla</button></div>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const TIPO_DATO_MEDICO = { P: "Patologie", A: "Allergie & Intolleranze", F: "Farmaci", T: "Terapie" };
+
+    let profiloCache = null;
+    let datiMediciCache = [];
+    let datoMedicoEditId = null;
+
+    // esposta perché richiamata dagli attributi onclick sopra
+    window.chiudiModale = closeModal;
+
+    function renderProfiloAnagrafico(data) {
+      const body = $("profile");
+      const { utente: u, profilo: p } = data;
+      const campi = {
+        Nome: u.nome,
+        Cognome: u.cognome,
+        Email: u.email,
+        Telefono: u.telefono,
+        "Codice fiscale": p.codice_fiscale,
+        "Data di nascita": p.data_nascita,
+        Sesso: p.sesso,
+        "Peso obiettivo (kg)": p.peso_obiettivo_kg,
+      };
+      body.innerHTML = Object.entries(campi)
+        .map(
+          ([label, value]) =>
+            `<tr><th>${esc(label)}</th><td>${esc(value ?? "-")}</td></tr>`
+        )
+        .join("");
+    }
+
+    function renderDatiMediciBox(lista) {
+      const box = $("dati-medici");
+      if (!lista.length) {
+        box.innerHTML = '<p class="has-text-grey">Nessun dato inserito</p>';
+        return;
+      }
+      box.innerHTML = Object.keys(TIPO_DATO_MEDICO)
+        .map((tipo) => {
+          const items = lista.filter((d) => d.tipo === tipo);
+          if (!items.length) return "";
+          const tags = items.map((item) => `<span class="tag">${esc(item.descrizione)}</span>`).join("");
+          return `<p class="is-size-7 has-text-grey mb-1">${TIPO_DATO_MEDICO[tipo].toUpperCase()}</p><div class="tags mb-3">${tags}</div>`;
+        })
+        .join("");
+    }
+
+    function renderDatiMediciModal(lista) {
+      const cont = $("medici-lista");
+      cont.innerHTML = Object.keys(TIPO_DATO_MEDICO)
+        .map((tipo) => {
+          const tags = lista
+            .filter((d) => d.tipo === tipo)
+            .map((item) => `<span class="tags has-addons mr-2 mb-2">
+              <span class="tag">${esc(item.descrizione)}</span>
+              <a class="tag" onclick="modificaDatoMedico(${item.id})"><i class="fa-solid fa-pen"></i></a>
+              <a class="tag is-delete" onclick="eliminaDatoMedico(${item.id})"></a>
+            </span>`)
+            .join("");
+          return `<p class="label">${TIPO_DATO_MEDICO[tipo]}</p><div class="tags">${tags}</div>`;
+        })
+        .join("");
+    }
+
+    async function caricaDatiMedici() {
+      datiMediciCache = await request("/me/dati-medici");
+      renderDatiMediciBox(datiMediciCache);
+    }
+
+    window.annullaModificaDatoMedico = function annullaModificaDatoMedico() {
+      datoMedicoEditId = null;
+      $("nuovo-tipo").value = "P";
+      $("nuovo-descrizione").value = "";
+      $("salva-dato-medico").textContent = "Aggiungi";
+      $("annulla-modifica-medico").hidden = true;
+    };
+
+    window.apriModaleMedici = function apriModaleMedici() {
+      renderDatiMediciModal(datiMediciCache);
+      annullaModificaDatoMedico();
+      openModal("modale-medici");
+    };
+
+    window.modificaDatoMedico = function modificaDatoMedico(id) {
+      const dato = datiMediciCache.find((item) => item.id === id);
+      if (!dato) return;
+      datoMedicoEditId = id;
+      $("nuovo-tipo").value = dato.tipo;
+      $("nuovo-descrizione").value = dato.descrizione;
+      $("salva-dato-medico").textContent = "Salva";
+      $("annulla-modifica-medico").hidden = false;
+    };
+
+    window.salvaDatoMedico = async function salvaDatoMedico() {
+      const tipo = $("nuovo-tipo").value;
+      const descrizione = $("nuovo-descrizione").value.trim();
+      if (!descrizione) return;
+      try {
+        await request(datoMedicoEditId ? `/me/dati-medici/${datoMedicoEditId}` : "/me/dati-medici", { method: datoMedicoEditId ? "PUT" : "POST", body: JSON.stringify({ tipo, descrizione }) });
+        await caricaDatiMedici();
+        renderDatiMediciModal(datiMediciCache);
+        annullaModificaDatoMedico();
+      } catch (err) {
+        message(err.message || "Impossibile salvare il dato");
+      }
+    };
+
+    window.eliminaDatoMedico = async function eliminaDatoMedico(id) {
+      if (!confirm("Eliminare questo dato?")) return;
+      try {
+        await request(`/me/dati-medici/${id}`, { method: "DELETE" });
+        await caricaDatiMedici();
+        renderDatiMediciModal(datiMediciCache);
+        if (datoMedicoEditId === id) annullaModificaDatoMedico();
+      } catch (err) {
+        message(err.message || "Impossibile eliminare il dato");
+      }
+    };
+
+    // Avvio -> al termine dello script carica anagrafica e dati medici del paziente
+    (async function init() {
+      try {
+        profiloCache = await request("/me/profilo");
+        renderProfiloAnagrafico(profiloCache);
+        await caricaDatiMedici();
+      } catch (err) {
+        message(err.message || "Impossibile caricare il profilo");
+      }
+    })();
+  })();
+</script>

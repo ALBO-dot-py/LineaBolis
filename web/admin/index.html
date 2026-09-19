@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <!-- TODO(sicurezza): 'unsafe-inline' in script-src -->
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Area Admin</title>
+  <link rel="icon" href="/web/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="/web/styles.css?v=20260721-2">
+</head>
+<body>
+  <nav class="navbar is-primary">
+    <div class="navbar-brand">
+      <span class="navbar-item has-text-weight-bold" id="page-title">Area Admin</span>
+    </div>
+    <div class="navbar-end">
+      <a class="navbar-item" onclick="logout()">Esci</a>
+    </div>
+  </nav>
+
+  <div class="tabs-bar">
+    <div class="tabs" id="tabs"><ul></ul></div>
+  </div>
+
+  <section class="section">
+    <div class="container is-fluid">
+      <div id="content"></div>
+    </div>
+  </section>
+
+  <script src="/web/app.js?v=20260721-2"></script>
+  <script>initTabsPage("A", "Area amministratore");</script>
+</body>
+</html>

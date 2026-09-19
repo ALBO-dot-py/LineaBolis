@@ -1,0 +1,174 @@
+<div id="dieta-loading" class="notification">
+  Caricamento dieta...
+</div>
+
+<div id="dieta-empty" class="notification is-light is-hidden">
+  Al momento non è presente alcuna dieta
+</div>
+
+<div id="dieta-error" class="notification is-danger is-light is-hidden"></div>
+
+<div id="dieta-content" class="is-hidden">
+
+  <p id="dieta-title" class="title is-4 mb-4"></p>
+
+  <div id="dieta-notes" class="message is-info is-hidden">
+    <div class="message-header">
+      <p>Indicazioni</p>
+    </div>
+    <div id="dieta-notes-content" class="message-body"></div>
+  </div>
+
+  <!-- tab dei giorni presenti solo per le diete settimanali -->
+  <div id="dieta-days-tabs" class="tabs is-toggle is-toggle-rounded is-fullwidth mb-4 is-hidden">
+    <ul></ul>
+  </div>
+
+  <div id="dieta-body"></div>
+
+</div>
+
+<script>
+  (function () {
+    const GIORNI_SETTIMANA = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
+    const contenuto = $("dieta-content");
+    const corpo = $("dieta-body");
+    const tabsWrap = $("dieta-days-tabs");
+    const tabsList = tabsWrap.querySelector("ul");
+
+    const ordinaPerOrdineEId = (elementi) =>
+      [...elementi].sort(
+        (a, b) => (a.ordine ?? 0) - (b.ordine ?? 0) || (a.id ?? 0) - (b.id ?? 0)
+      );
+
+    // Per ogni alimento solo descrizione testuale
+    function htmlAlimento(alimento) {
+      return `<li class="mb-2">${esc(alimento.descrizione ?? "")}</li>`;
+    }
+
+    // Una singola opzione mostra i propri alimenti
+    // Se il pasto ha più opzioni, tra un'opzione e la successiva viene mostrata l'etichetta "OPPURE"
+    function htmlOpzioni(opzioni) {
+      const ordinate = ordinaPerOrdineEId(opzioni);
+      const mostraEtichette = ordinate.length > 1;
+      const blocchi = ordinate.map((opzione, indice) => {
+        const separatore = indice > 0
+          ? '<p class="has-text-centered my-2"><span class="tag is-warning is-light">OPPURE</span></p>'
+          : "";
+        const titolo = mostraEtichette
+          ? `<p class="is-size-7 has-text-weight-semibold has-text-grey mb-2">Opzione ${indice + 1}</p>`
+          : "";
+        const alimenti = ordinaPerOrdineEId(Array.isArray(opzione.alimenti) ? opzione.alimenti : []);
+        return `${separatore}<div class="box py-3 mb-2">
+            ${titolo}
+            <ul>${alimenti.map(htmlAlimento).join("")}</ul>
+          </div>`;
+      }).join("");
+      return `<div class="notification has-background-white-ter">${blocchi}</div>`;
+    }
+
+    // Per ogni pasto si ha intestazione con eventuale nota
+    function htmlPasto(pasto) {
+      const nota = pasto.note && pasto.note.trim() !== ""
+        ? `<p class="is-size-7 has-text-grey mb-3">${esc(pasto.note)}</p>`
+        : "";
+
+      const opzioni = Array.isArray(pasto.opzioni) ? pasto.opzioni : [];
+      const corpo = opzioni.length
+        ? htmlOpzioni(opzioni)
+        : '<p class="has-text-grey is-size-7">Nessun alimento indicato.</p>';
+
+      return `<div class="card mb-4">
+          <header class="card-header has-background-primary-light">
+            <p class="card-header-title has-text-primary-dark">
+              <span class="icon mr-2"><i class="fa-solid fa-utensils"></i></span>${esc(pasto.nome ?? "")}
+            </p>
+          </header>
+          <div class="card-content">${nota}${corpo}</div>
+        </div>`;
+    }
+
+    function htmlPasti(pasti) {
+      return pasti.length
+        ? `<div class="columns">${pasti.map((pasto) => `<div class="column">${htmlPasto(pasto)}</div>`).join("")}</div>`
+        : '<p class="has-text-grey">Nessun pasto previsto.</p>';
+    }
+
+    function mostraStatoDieta(stato, messaggio) {
+      ["dieta-loading", "dieta-empty", "dieta-error", "dieta-content"]
+        .forEach((id) => $(id).classList.add("is-hidden"));
+
+      if (stato === "loading") $("dieta-loading").classList.remove("is-hidden");
+      if (stato === "empty") $("dieta-empty").classList.remove("is-hidden");
+      if (stato === "error") {
+        $("dieta-error").textContent = messaggio || "Non è stato possibile caricare la dieta.";
+        $("dieta-error").classList.remove("is-hidden");
+      }
+      if (stato === "content") contenuto.classList.remove("is-hidden");
+    }
+
+    function renderDieta(dieta) {
+      $("dieta-title").textContent = dieta.nome;
+
+      const haNote = dieta.note && dieta.note.trim() !== "";
+      $("dieta-notes").classList.toggle("is-hidden", !haNote);
+      $("dieta-notes-content").textContent = haNote ? dieta.note : "";
+
+      const pasti = Array.isArray(dieta.pasti) ? dieta.pasti : [];
+      tabsList.replaceChildren();
+
+      if (dieta.tipo === "G") {
+        tabsWrap.classList.add("is-hidden");
+        corpo.innerHTML = htmlPasti(ordinaPerOrdineEId(pasti));
+        return;
+      }
+
+      tabsWrap.classList.remove("is-hidden");
+      corpo.innerHTML = GIORNI_SETTIMANA.map((nomeGiorno, indice) => {
+        tabsList.insertAdjacentHTML("beforeend",
+          `<li class="${indice === 0 ? "is-active" : ""}"><a href="#" data-day-tab="${indice}">${nomeGiorno}</a></li>`);
+        const pastiDelGiorno = ordinaPerOrdineEId(pasti.filter((p) => p.giorno_settimana === indice));
+        return `<div data-day-panel="${indice}" class="${indice === 0 ? "" : "is-hidden"}">${htmlPasti(pastiDelGiorno)}</div>`;
+      }).join("");
+    }
+
+    // Click sulle tab dei giorni -> attiva la tab e mostra il pannello corrispondente
+    contenuto.addEventListener("click", (evento) => {
+      const tab = evento.target.closest("[data-day-tab]");
+      if (!tab) return;
+      evento.preventDefault();
+
+      const giorno = tab.dataset.dayTab;
+      tabsList.querySelectorAll("[data-day-tab]").forEach((el) => {
+        el.closest("li").classList.toggle("is-active", el === tab);
+      });
+      corpo.querySelectorAll("[data-day-panel]").forEach((pannello) => {
+        pannello.classList.toggle("is-hidden", pannello.dataset.dayPanel !== giorno);
+      });
+    });
+
+    async function caricaDietaAttiva() {
+      mostraStatoDieta("loading");
+      try {
+        const dieta = await request("/me/dieta");
+        if (!dieta) {
+          mostraStatoDieta("empty");
+          return;
+        }
+        renderDieta(dieta);
+        mostraStatoDieta("content");
+      } catch (err) {
+        if (err.status === 404) {
+          mostraStatoDieta("empty");
+        } else if (err.status === 403) {
+          mostraStatoDieta("error", "Non sei autorizzato a visualizzare questa dieta.");
+        } else if (err.status !== 401) {
+          mostraStatoDieta("error", err.message);
+        }
+      }
+    }
+
+    // Avvio -> al termine dello script carica la dieta attiva del paziente
+    caricaDietaAttiva();
+  })();
+</script>

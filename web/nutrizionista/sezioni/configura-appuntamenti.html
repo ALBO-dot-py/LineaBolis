@@ -1,0 +1,211 @@
+<div id="message" class="notification" hidden></div>
+
+<div class="mb-5">
+  <h2 class="title is-3 mb-2">Configura appuntamenti</h2>
+</div>
+
+<div class="columns is-variable is-5">
+  <div class="column is-7">
+    <section class="box">
+      <div class="level mb-4">
+        <div class="level-left">
+          <h3 class="title is-5 mb-0">Tipologie</h3>
+        </div>
+        <div class="level-right">
+          <button class="button is-primary is-light" type="button" onclick="resetAppointmentTypeForm()">
+            <span class="icon"><i class="fa-solid fa-plus"></i></span>
+            <span>Nuova tipologia</span>
+          </button>
+        </div>
+      </div>
+      <div id="appointment-types-list"></div>
+    </section>
+  </div>
+
+  <div class="column is-5">
+    <section class="box">
+      <h3 id="appointment-type-form-title" class="title is-5">Nuova tipologia</h3>
+      <form id="appointment-type-form" onsubmit="saveAppointmentType(event)">
+        <div class="field">
+          <label class="label" for="appointment-type-name">Nome</label>
+          <div class="control">
+            <input id="appointment-type-name" name="nome" class="input" type="text" maxlength="75" required placeholder="Es. Prima visita nutrizionale">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="appointment-type-description">Descrizione</label>
+          <div class="control">
+            <textarea id="appointment-type-description" name="descrizione" class="textarea" rows="3" placeholder="Descrizione facoltativa"></textarea>
+          </div>
+        </div>
+
+        <div class="columns">
+          <div class="column">
+            <div class="field">
+              <label class="label" for="appointment-type-price">Prezzo base (€)</label>
+              <div class="control">
+                <input id="appointment-type-price" name="prezzo_euro" class="input" type="number" min="0" step="0.01" value="0" required>
+              </div>
+            </div>
+          </div>
+          <div class="column">
+            <div class="field">
+              <label class="label" for="appointment-type-duration">Durata</label>
+              <div class="control">
+                <input id="appointment-type-duration" name="durata" class="input" type="number" min="15" step="15" value="60" required>
+              </div>
+              <p class="help">Deve essere a multipli di 15 minuti es. 15, 30, 45, 60, ecc...</p>,
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="checkbox">
+            <input name="prenotabile_paziente" type="checkbox" checked>
+            Prenotabile dal paziente
+          </label>
+          <p class="help">Se disattivato, l'appuntamento non può essere prenotato dal paziente</p>
+        </div>
+
+        <div class="field">
+          <label class="checkbox">
+            <input name="conferma_automatica" type="checkbox">
+            Conferma automaticamente gli appuntamenti di questa tipologia
+          </label>
+          <p class="help">Se disattivato, gli appuntamenti richiedono accettazione del paziente</p>
+        </div>
+
+        <div class="buttons mt-4">
+          <button class="button is-primary" type="submit">Salva</button>
+          <button class="button is-light" type="button" onclick="resetAppointmentTypeForm()">Annulla</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+<script>
+  (function () {
+    let appointmentTypes = [];
+    const form = $("appointment-type-form");
+    const fields = form.elements;
+
+    function boolBadge(value, yesText, noText) {
+      return value
+        ? `<span class="tag is-success is-light">${yesText}</span>`
+        : `<span class="tag is-warning is-light">${noText}</span>`;
+    }
+
+    function typeCard(item) {
+      const description = item.descrizione
+        ? `<p class="has-text-grey mt-2">${esc(item.descrizione)}</p>`
+        : "";
+      return `<article class="box mb-3">
+        <div class="level is-mobile mb-2">
+          <div class="level-left">
+            <div>
+              <h4 class="title is-6 mb-1">${esc(item.nome)}</h4>
+              <div class="tags mb-0">
+                ${boolBadge(item.prenotabile_paziente, "Prenotabile", "Non prenotabile")}
+                ${boolBadge(item.conferma_automatica, "Conferma automatica", "Accettazione paziente")}
+              </div>
+            </div>
+          </div>
+          <div class="level-right">
+            <div class="buttons mb-0">
+              <button class="button is-small is-light" type="button" onclick="editAppointmentType(${item.id})">Modifica</button>
+              <button class="button is-small is-danger is-light" type="button" onclick="deleteAppointmentType(${item.id})">Elimina</button>
+            </div>
+          </div>
+        </div>
+        ${description}
+        <div class="tags mt-3 mb-0">,
+          <span class="tag">${esc(item.durata)} min</span>
+          <span class="tag">${euro(item.prezzo_base_cent)}</span>
+        </div>
+      </article>`;
+    }
+
+    function renderTypes() {
+      const target = $("appointment-types-list");
+      target.innerHTML = appointmentTypes.length
+        ? appointmentTypes.map(typeCard).join("")
+        : '<div class="notification is-light mb-0">Nessuna tipologia configurata.</div>';
+    }
+
+    function formPayload() {
+      return {
+        nome: fields.nome.value.trim(),
+        descrizione: fields.descrizione.value.trim() || null,
+        prezzo_base_cent: Math.round((fields.prezzo_euro.valueAsNumber || 0) * 100),
+        durata: fields.durata.valueAsNumber,
+        prenotabile_paziente: fields.prenotabile_paziente.checked,
+        conferma_automatica: fields.conferma_automatica.checked,
+      };
+    }
+
+    async function loadAppointmentTypes() {
+      try {
+        appointmentTypes = await request("/appuntamenti/tipi");
+        renderTypes();
+      } catch (err) {
+        message(err.message || "Impossibile caricare le tipologie");
+      }
+    }
+
+    window.resetAppointmentTypeForm = function resetAppointmentTypeForm() {
+      form.reset();
+      form.dataset.id = "";
+      $("appointment-type-form-title").textContent = "Nuova tipologia";
+    };
+
+    window.editAppointmentType = function editAppointmentType(id) {
+      const item = appointmentTypes.find((type) => type.id === id);
+      if (!item) return;
+
+      form.dataset.id = String(item.id);
+      $("appointment-type-form-title").textContent = "Modifica tipologia";
+      fields.nome.value = item.nome;
+      fields.descrizione.value = item.descrizione || "";
+      fields.prezzo_euro.value = Number(item.prezzo_base_cent || 0) / 100;
+      fields.durata.value = item.durata;
+      fields.prenotabile_paziente.checked = Boolean(item.prenotabile_paziente);
+      fields.conferma_automatica.checked = Boolean(item.conferma_automatica);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.saveAppointmentType = async function saveAppointmentType(event) {
+      event.preventDefault();
+      try {
+        const id = form.dataset.id;
+        await request(id ? `/appuntamenti/tipi/${id}` : "/appuntamenti/tipi", {
+          method: id ? "PUT" : "POST",
+          body: JSON.stringify(formPayload()),
+        });
+        message(id ? "Tipologia aggiornata." : "Tipologia creata con successo", "is-success");
+        resetAppointmentTypeForm();
+        await loadAppointmentTypes();
+      } catch (err) {
+        message(err.message || "Impossibile salvare la tipologia");
+      }
+    };
+
+    window.deleteAppointmentType = async function deleteAppointmentType(id) {
+      const item = appointmentTypes.find((type) => type.id === id);
+      if (!item || !window.confirm(`Eliminare definitivamente “${item.nome}”?`)) return;
+
+      try {
+        await request(`/appuntamenti/tipi/${id}`, { method: "DELETE" });
+        if (form.dataset.id === String(id)) resetAppointmentTypeForm();
+        message("Tipologia eliminata.", "is-success");
+        await loadAppointmentTypes();
+      } catch (err) {
+        message(err.message || "Impossibile eliminare la tipologia");
+      }
+    };
+
+    resetAppointmentTypeForm();
+    loadAppointmentTypes();
+  })();
+</script>

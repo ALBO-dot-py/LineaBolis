@@ -1,0 +1,78 @@
+<div id="message" class="notification" hidden></div>
+<div class="box">
+  <h2 class="title is-5">Gestione pazienti</h2>
+  <div class="columns">
+    <div class="column is-6"><input id="ap-search" class="input" type="search" placeholder="Cerca per nome, email o codice fiscale" oninput="apLoad()"></div>
+    <div class="column is-3"><div class="select is-fullwidth"><select id="ap-state" onchange="apLoad()"><option value="">Tutti gli stati</option><option value="A">Attivi</option><option value="D">Disattivati</option></select></div></div>
+    <div class="column is-3"><div class="select is-fullwidth"><select id="ap-nutritionist" onchange="apLoad()"><option value="">Tutti i nutrizionisti</option></select></div></div>
+  </div>
+  <div class="table-container">
+    <table class="table is-fullwidth is-striped is-hoverable">
+      <thead><tr><th>Paziente</th><th>Email</th><th>Nutrizionista assegnato</th><th>Ultimo accesso</th><th>Stato</th><th>Azioni</th></tr></thead>
+      <tbody id="ap-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  const stateTag = (state) => state === "A" ? '<span class="tag is-success">Attivo</span>' : '<span class="tag is-warning">Disattivato</span>';
+
+  async function loadNutritionists() {
+    const list = await request("/admin/nutrizionisti?limit=200");
+    $("ap-nutritionist").innerHTML = '<option value="">Tutti i nutrizionisti</option>' + list.map((item) => `<option value="${item.utente.id}">${esc(item.utente.nome)} ${esc(item.utente.cognome)}</option>`).join("");
+  }
+
+  window.apLoad = async function apLoad() {
+    const params = new URLSearchParams({ limit: "200" });
+    const q = $("ap-search").value.trim();
+    const state = $("ap-state").value;
+    const nutritionist = $("ap-nutritionist").value;
+    if (q) params.set("q", q);
+    if (state) params.set("stato", state);
+    if (nutritionist) params.set("nutrizionista_id", nutritionist);
+    try {
+      const rows = await request(`/admin/pazienti?${params}`);
+      $("ap-body").innerHTML = rows.length ? rows.map(renderRow).join("") : '<tr><td colspan="6" class="has-text-grey">Nessun paziente trovato.</td></tr>';
+    } catch (err) { message(err.message); }
+  };
+
+  function renderRow(item) {
+    const u = item.utente;
+    const toggle = u.stato === "A"
+      ? `<button class="button is-small is-warning" onclick="apToggle(${u.id},'disattiva')">Disattiva</button>`
+      : `<button class="button is-small is-success" onclick="apToggle(${u.id},'attiva')">Attiva</button>`;
+    return `<tr><td><strong>${esc(u.nome)} ${esc(u.cognome)}</strong><br><span class="is-size-7">${esc(u.telefono || "-")}</span></td>
+      <td>${esc(u.email)}</td>
+      <td>${esc(item.nutrizionista_nome)}<br><span class="is-size-7">${esc(item.nutrizionista_email)}</span></td>
+      <td>${u.last_login_at ? fmtDate(u.last_login_at) : "-"}</td><td>${stateTag(u.stato)}</td>
+      <td><div class="buttons are-small">${toggle}
+        <button class="button is-link is-light" onclick="apSetupPassword(${u.id})">Imposta password</button>
+        <button class="button is-danger is-light" onclick="apLogout(${u.id})">Logout dispositivi</button>
+      </div></td></tr>`;
+  }
+
+  window.apToggle = async function apToggle(id, action) {
+    try { await request(`/admin/pazienti/${id}/${action}`, { method: "PATCH" }); await apLoad(); }
+    catch (err) { message(err.message); }
+  };
+  window.apSetupPassword = async function apSetupPassword(id) {
+    if (!confirm("Generare un nuovo link? L’account verrà disattivato e le sessioni revocate")) return;
+    try {
+      const result = await request(`/admin/pazienti/${id}/imposta-password`, { method: "POST" });
+      await apLoad();
+      linkMessage(result.url_impostazione_password, "Nuovo link per impostare la password");
+    } catch (err) { message(err.message); }
+  };
+  window.apLogout = async function apLogout(id) {
+    if (!confirm("Disconnettere il paziente da tutti i dispositivi?")) return;
+    try { await request(`/admin/pazienti/${id}/logout-all`, { method: "POST" }); message("Sessioni revocate con successo", "is-success"); }
+    catch (err) { message(err.message); }
+  };
+
+  (async function init() {
+    try { await loadNutritionists(); await apLoad(); }
+    catch (err) { message(err.message); }
+  })();
+})();
+</script>
